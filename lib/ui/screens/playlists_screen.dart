@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../library_store.dart';
-import '../models.dart';
-import '../player_service.dart';
-import '../widgets.dart';
+import '../../library_store.dart';
+import '../../models.dart';
+import '../../player_service.dart';
+import '../theme/app_tokens.dart';
+import '../components/components.dart';
 
 class PlaylistsScreen extends StatelessWidget {
   const PlaylistsScreen({super.key, required this.library, required this.player});
@@ -20,9 +21,9 @@ class PlaylistsScreen extends StatelessWidget {
       body: ListView(
         children: [
           ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Colors.pinkAccent,
-              child: Icon(Icons.favorite, color: Colors.white),
+            leading: CircleAvatar(
+              backgroundColor: context.tokens.favorite,
+              child: Icon(Icons.favorite, color: context.tokens.onCover),
             ),
             title: const Text('Избранное'),
             subtitle: Text('$favCount треков'),
@@ -132,9 +133,9 @@ class PlaylistDetailScreen extends StatelessWidget {
           body: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                padding: EdgeInsets.fromLTRB(context.tokens.pad, context.tokens.gap, context.tokens.pad, 0),
                 child: Wrap(
-                  spacing: 8,
+                  spacing: context.tokens.gap,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     FilledButton.icon(
@@ -184,6 +185,7 @@ class PlaylistDetailScreen extends StatelessWidget {
   }
 
   Widget _tile(List<Track> tracks, int i, Playlist? playlist) => TrackTile(
+        index: i,
         track: tracks[i],
         library: library,
         player: player,

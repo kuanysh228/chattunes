@@ -5,10 +5,11 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 
 import 'library_store.dart';
 import 'player_service.dart';
-import 'screens/home_shell.dart';
-import 'screens/setup_screen.dart';
 import 'settings.dart';
 import 'stats.dart';
+import 'ui/screens/home_shell.dart';
+import 'ui/screens/setup_screen.dart';
+import 'ui/theme/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +24,17 @@ Future<void> main() async {
   await stats.init(library.dir);
   final settings = AppSettings(library.prefs);
   final player = PlayerService(library, stats, settings);
+  final themes = ThemeController(prefs: library.prefs, dir: Directory('${library.dir.path}/themes'));
+  await themes.load();
+  themes.startWatching();
 
-  runApp(ChatTunesApp(library: library, player: player, stats: stats, settings: settings));
+  runApp(ChatTunesApp(
+    library: library,
+    player: player,
+    stats: stats,
+    settings: settings,
+    themes: themes,
+  ));
 }
 
 class ChatTunesApp extends StatelessWidget {
@@ -34,28 +44,35 @@ class ChatTunesApp extends StatelessWidget {
     required this.player,
     required this.stats,
     required this.settings,
+    required this.themes,
   });
 
   final LibraryStore library;
   final PlayerService player;
   final StatsStore stats;
   final AppSettings settings;
+  final ThemeController themes;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ChatTunes',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
-      home: ListenableBuilder(
-        listenable: library,
-        builder: (context, _) => library.configured
-            ? HomeShell(library: library, player: player, stats: stats, settings: settings)
-            : SetupScreen(library: library),
+    return ListenableBuilder(
+      listenable: themes,
+      builder: (context, _) => MaterialApp(
+        title: 'ChatTunes',
+        debugShowCheckedModeBanner: false,
+        theme: themes.themeData,
+        home: ListenableBuilder(
+          listenable: library,
+          builder: (context, _) => library.configured
+              ? HomeShell(
+                  library: library,
+                  player: player,
+                  stats: stats,
+                  settings: settings,
+                  themes: themes,
+                )
+              : SetupScreen(library: library),
+        ),
       ),
     );
   }

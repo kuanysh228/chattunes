@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../library_store.dart';
+import '../../library_store.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key, required this.library});

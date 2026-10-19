@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../library_store.dart';
-import '../player_service.dart';
-import '../settings.dart';
-import '../stats.dart';
-import '../widgets.dart';
+import '../../library_store.dart';
+import '../../player_service.dart';
+import '../../settings.dart';
+import '../../stats.dart';
+import '../components/components.dart';
+import '../theme/theme_controller.dart';
+import 'themes_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -13,12 +15,14 @@ class SettingsScreen extends StatefulWidget {
     required this.player,
     required this.settings,
     required this.stats,
+    required this.themes,
   });
 
   final LibraryStore library;
   final PlayerService player;
   final AppSettings settings;
   final StatsStore stats;
+  final ThemeController themes;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -39,6 +43,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         appBar: AppBar(title: const Text('Настройки')),
         body: ListView(
           children: [
+            const SectionTitle('Внешний вид'),
+            ListenableBuilder(
+              listenable: widget.themes,
+              builder: (context, _) => ListTile(
+                leading: const Icon(Icons.palette),
+                title: const Text('Тема'),
+                subtitle: Text(widget.themes.selected.title),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => ThemesScreen(themes: widget.themes),
+                )),
+              ),
+            ),
             const SectionTitle('Воспроизведение'),
             SwitchListTile(
               title: const Text('Автопродолжение'),

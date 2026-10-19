@@ -1,0 +1,78 @@
+{
+  "$schema": "../docs/theme.schema.json",
+  "format": 1,
+  "name": "Terminal",
+  "author": "ChatTunes",
+  "description": "Green on black, square corners, dense lists, numbered tracks. On wide screens the player is a panel on the right and navigation is a rail on the left; on a phone it collapses to the usual strips.",
+  "brightness": "dark",
+  "colors": {
+    "seed": "#33FF66",
+    "primary": "#33FF66",
+    "onPrimary": "#001A08",
+    "surface": "#050A06",
+    "onSurface": "#B6F5C4",
+    "surfaceContainer": "#0A140C",
+    "surfaceContainerHigh": "#10201A",
+    "favorite": "#FFEB3B",
+    "onCover": "#001A08"
+  },
+  "shape": {
+    "radius": 0,
+    "coverRadius": 0
+  },
+  "spacing": {
+    "pad": 12,
+    "gap": 6,
+    "density": "compact"
+  },
+  "typography": {
+    "scale": 0.95
+  },
+  "cover": {
+    "style": "flat"
+  },
+  "layout": {
+    "shell": {
+      "column": [
+        "header",
+        "content",
+        "player",
+        "navigation"
+      ]
+    },
+    "shellWide": {
+      "row": [
+        "navigation",
+        {
+          "column": [
+            "header",
+            "content"
+          ]
+        },
+        "player"
+      ]
+    },
+    "navigationLabels": "never",
+    "player": {
+      "style": "flat",
+      "controls": [
+        "previous",
+        "play",
+        "next",
+        "shuffle",
+        "repeat"
+      ]
+    },
+    "trackRow": {
+      "leading": "number",
+      "subtitle": [
+        "artist"
+      ],
+      "trailing": [
+        "duration",
+        "favorite",
+        "menu"
+      ]
+    }
+  }
+}

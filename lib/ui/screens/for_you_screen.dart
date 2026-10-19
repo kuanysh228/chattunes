@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../library_store.dart';
-import '../player_service.dart';
-import '../recommender.dart';
-import '../stats.dart';
-import '../widgets.dart';
+import '../../library_store.dart';
+import '../../player_service.dart';
+import '../../recommender.dart';
+import '../../stats.dart';
+import '../theme/app_tokens.dart';
+import '../components/components.dart';
 
 class ForYouScreen extends StatefulWidget {
   const ForYouScreen({
@@ -67,11 +68,11 @@ class _ForYouScreenState extends State<ForYouScreen> {
         children: [
           if (_rec.coldStart)
             Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(12),
+              margin: EdgeInsets.all(context.tokens.pad),
+              padding: EdgeInsets.all(context.tokens.pad - 4),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(context.tokens.radius),
               ),
               child: const Text(
                 'Пока мало данных. Послушай несколько треков до конца, '
@@ -113,6 +114,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
         ),
         for (var i = 0; i < recs.length; i++)
           TrackTile(
+            index: i,
             track: recs[i].track,
             library: widget.library,
             player: widget.player,

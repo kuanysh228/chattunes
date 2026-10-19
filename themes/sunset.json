@@ -1,0 +1,20 @@
+{
+  "$schema": "../docs/theme.schema.json",
+  "format": 1,
+  "name": "Sunset Deck",
+  "author": "ChatTunes",
+  "description": "Warm colors. The player sits at the TOP and navigation at the bottom, to show how a theme can rearrange the screen.",
+  "brightness": "dark",
+  "colors": {
+    "seed": "#FF7043",
+    "surface": "#1C1210",
+    "favorite": "#FFD54F"
+  },
+  "shape": { "radius": 20, "coverRadius": 0.5 },
+  "cover": { "style": "gradient", "saturation": 0.7, "lightness": 0.45 },
+  "layout": {
+    "shell": { "column": ["header", "player", "content", "navigation"] },
+    "navigationLabels": "selected",
+    "player": { "style": "flat", "progress": "top" }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "../docs/theme.schema.json",
+  "format": 1,
+  "name": "ChatTunes Dark",
+  "author": "ChatTunes",
+  "description": "The default look.",
+  "brightness": "dark",
+  "colors": { "seed": "#009688" }
+}

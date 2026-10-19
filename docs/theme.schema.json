@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/kuanysh228/chattunes/docs/theme.schema.json",
+  "title": "ChatTunes theme",
+  "description": "A ChatTunes theme file. Add \"$schema\": \"<path to this file>\" to get autocomplete and validation in VS Code and most editors.",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "type": "integer", "const": 1, "description": "Theme format version." },
+    "name": { "type": "string", "minLength": 1, "description": "Shown in the theme list." },
+    "author": { "type": "string" },
+    "description": { "type": "string" },
+    "brightness": { "enum": ["dark", "light"], "default": "dark" },
+
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Set 'seed' to generate a full palette, then override single colors if you want.",
+      "properties": {
+        "seed": { "$ref": "#/$defs/color", "description": "Base color the whole palette is generated from." },
+        "primary": { "$ref": "#/$defs/color" },
+        "onPrimary": { "$ref": "#/$defs/color" },
+        "secondary": { "$ref": "#/$defs/color" },
+        "onSecondary": { "$ref": "#/$defs/color" },
+        "tertiary": { "$ref": "#/$defs/color" },
+        "onTertiary": { "$ref": "#/$defs/color" },
+        "error": { "$ref": "#/$defs/color" },
+        "onError": { "$ref": "#/$defs/color" },
+        "surface": { "$ref": "#/$defs/color", "description": "App background." },
+        "onSurface": { "$ref": "#/$defs/color", "description": "Main text color." },
+        "surfaceContainer": { "$ref": "#/$defs/color" },
+        "surfaceContainerHigh": { "$ref": "#/$defs/color", "description": "Player, cards and menus." },
+        "outline": { "$ref": "#/$defs/color" },
+        "favorite": { "$ref": "#/$defs/color", "description": "Heart color." },
+        "onCover": { "$ref": "#/$defs/color", "description": "Letter and icons drawn over covers." },
+        "chartPrimary": { "$ref": "#/$defs/color" },
+        "chartSecondary": { "$ref": "#/$defs/color" }
+      }
+    },
+
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "radius": { "type": "number", "minimum": 0, "maximum": 32, "default": 14, "description": "Corner radius of cards, dialogs, sheets and buttons." },
+        "coverRadius": { "type": "number", "minimum": 0, "maximum": 0.5, "default": 0.14, "description": "Cover corner radius as a fraction of its size. 0.5 is a circle." }
+      }
+    },
+
+    "spacing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pad": { "type": "number", "minimum": 8, "maximum": 32, "default": 16, "description": "Outer padding of screens and sections." },
+        "gap": { "type": "number", "minimum": 4, "maximum": 16, "default": 8, "description": "Small gap between related elements." },
+        "density": { "enum": ["comfortable", "standard", "compact"], "default": "comfortable", "description": "Height of list rows and controls." }
+      }
+    },
+
+    "typography": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scale": { "type": "number", "minimum": 0.8, "maximum": 1.3, "default": 1.0, "description": "Multiplies every font size." }
+      }
+    },
+
+    "cover": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": { "enum": ["gradient", "solid", "flat"], "default": "gradient" },
+        "saturation": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.45 },
+        "lightness": { "type": "number", "minimum": 0.1, "maximum": 0.9, "default": 0.35 }
+      }
+    },
+
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shell": { "$ref": "#/$defs/shellNode", "description": "Arrangement of the main screen. Must contain 'header' and 'content', and 'navigation' when there is more than one tab. Used at every width unless 'shellWide' is set." },
+        "shellWide": { "$ref": "#/$defs/shellNode", "description": "Arrangement from 800 px width up. Falls back to 'shell'." },
+        "tabs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["library", "forYou", "playlists", "stats"] },
+          "description": "Tabs to show, in order. Leave tabs out to hide them."
+        },
+        "navigationLabels": { "enum": ["always", "selected", "never"], "default": "always" },
+        "player": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "style": { "enum": ["raised", "flat"], "default": "raised" },
+            "progress": { "enum": ["top", "bottom", "hidden"], "default": "bottom", "description": "Where the progress line sits in the compact player. In a side panel, 'hidden' removes the seek bar." },
+            "controls": { "$ref": "#/$defs/controls", "description": "Buttons in the compact player, in order." },
+            "showCover": { "type": "boolean", "default": true }
+          }
+        },
+        "nowPlaying": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "arrangement": { "enum": ["vertical", "horizontal"], "default": "vertical", "description": "'horizontal' puts the cover beside the controls on wide screens." },
+            "controls": { "$ref": "#/$defs/controls", "description": "Buttons on the full Now Playing screen, in order." }
+          }
+        },
+        "trackRow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "leading": { "enum": ["cover", "number", "none"], "default": "cover" },
+            "coverSize": { "type": "number", "minimum": 28, "maximum": 80, "default": 44 },
+            "subtitle": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "enum": ["artist", "duration"] },
+              "description": "Parts of the second line, in order."
+            },
+            "trailing": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "enum": ["favorite", "status", "duration", "menu"] },
+              "description": "Elements at the end of the row, in order."
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+      "description": "#RGB, #RRGGBB or #RRGGBBAA."
+    },
+    "controls": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["previous", "play", "next", "shuffle", "repeat", "favorite", "queue"] }
+    },
+    "shellNode": {
+      "oneOf": [
+        { "enum": ["header", "content", "navigation", "player"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "row": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/shellNode" } },
+            "column": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/shellNode" } }
+          }
+        }
+      ]
+    }
+  }
+}

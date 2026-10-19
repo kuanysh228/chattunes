@@ -1,0 +1,17 @@
+{
+  "$schema": "../docs/theme.schema.json",
+  "format": 1,
+  "name": "AMOLED Black",
+  "author": "ChatTunes",
+  "description": "True black background, sharp corners. Easy on OLED screens.",
+  "brightness": "dark",
+  "colors": {
+    "seed": "#00E5FF",
+    "surface": "#000000",
+    "surfaceContainer": "#0D0D0D",
+    "surfaceContainerHigh": "#161616",
+    "favorite": "#FF5252"
+  },
+  "shape": { "radius": 6, "coverRadius": 0.08 },
+  "cover": { "style": "solid", "saturation": 0.55, "lightness": 0.3 }
+}

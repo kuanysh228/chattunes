@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../library_store.dart';
-import '../models.dart';
-import '../player_service.dart';
-import '../stats.dart';
-import '../widgets.dart';
+import '../../library_store.dart';
+import '../../models.dart';
+import '../../player_service.dart';
+import '../../stats.dart';
+import '../theme/app_tokens.dart';
+import '../components/components.dart';
 
 enum _Sort { newest, title, artist, mostPlayed }
 
@@ -76,21 +77,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
     return Scaffold(
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
-            child: Row(
+            padding: EdgeInsets.fromLTRB(context.tokens.pad, context.tokens.gap, context.tokens.pad, 0),
+            child: TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Поиск по названию и исполнителю',
+                border: InputBorder.none,
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+          ),
+          // A Wrap, not a Row: themes can squeeze this column next to side panels.
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.tokens.pad),
+            child: Wrap(
+              spacing: context.tokens.gap,
+              runSpacing: 0,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Поиск по названию и исполнителю',
-                      border: InputBorder.none,
-                    ),
-                    onChanged: (v) => setState(() => _query = v),
-                  ),
-                ),
                 FilterChip(
                   label: const Text('Избранное'),
                   avatar: const Icon(Icons.favorite, size: 16),
@@ -107,25 +114,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       PopupMenuItem(value: e.key, child: Text(e.value)),
                   ],
                 ),
-              ],
-            ),
-          ),
-          if (tracks.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Text('${tracks.length} треков',
-                      style: Theme.of(context).textTheme.bodySmall),
-                  const Spacer(),
+                if (tracks.isNotEmpty) ...[
+                  Text('${tracks.length} треков', style: Theme.of(context).textTheme.bodySmall),
                   TextButton.icon(
                     onPressed: () => widget.player.playContext(tracks, 0, shuffleOn: true),
                     icon: const Icon(Icons.shuffle, size: 18),
                     label: const Text('Перемешать'),
                   ),
                 ],
-              ),
+              ],
             ),
+          ),
           Expanded(
             child: tracks.isEmpty
                 ? Center(
@@ -136,6 +135,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 : ListView.builder(
                     itemCount: tracks.length,
                     itemBuilder: (context, i) => TrackTile(
+                      index: i,
                       track: tracks[i],
                       library: lib,
                       player: widget.player,

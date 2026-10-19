@@ -72,6 +72,15 @@ class LibraryStore extends ChangeNotifier {
     }
   }
 
+  /// Sets up storage without platform plugins, so UI tests can build a
+  /// library from sample data. Never connects to Telegram.
+  @visibleForTesting
+  Future<void> initForTest({required SharedPreferences prefs, required Directory dir}) async {
+    this.prefs = prefs;
+    this.dir = dir;
+    await cacheDir.create(recursive: true);
+  }
+
   File get _libraryFile => File('${dir.path}/library.json');
 
   Future<void> _loadLocal() async {

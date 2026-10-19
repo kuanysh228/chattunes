@@ -1,0 +1,20 @@
+{
+  "$schema": "../docs/theme.schema.json",
+  "format": 1,
+  "name": "Paper",
+  "author": "ChatTunes",
+  "description": "Light and airy. Large rounded covers and a wide, side-by-side Now Playing view.",
+  "brightness": "light",
+  "colors": {
+    "seed": "#5C6BC0",
+    "surface": "#FAF8F5",
+    "favorite": "#E53935"
+  },
+  "shape": { "radius": 18, "coverRadius": 0.2 },
+  "spacing": { "pad": 20, "gap": 10 },
+  "cover": { "style": "gradient", "saturation": 0.35, "lightness": 0.62 },
+  "layout": {
+    "nowPlaying": { "arrangement": "horizontal" },
+    "trackRow": { "coverSize": 56 }
+  }
+}

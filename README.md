@@ -26,6 +26,40 @@ no third-party servers: just your bot and your chat.
 | **Offline** | Keep favorites and chosen playlists on the device; cache is capped with LRU eviction |
 | **Stats** | Listening time, plays, day streak, skip rate, charts by day and hour, top tracks and artists |
 | **Recommendations** | Daily mix, "Haven't heard in a while", "New from artists you love", autoplay |
+| **Themes** | A theme is one JSON file: colors, shapes, and the **layout** itself. Move the player to the top or a side panel, reorder tabs, pick the controls. Edit the file and the app restyles live |
+
+<p>
+  <img src="docs/screenshots/theme-chattunes-dark-phone.png" width="23%" alt="Library, dark theme">
+  <img src="docs/screenshots/tab-foryou.png" width="23%" alt="For you: recommendations">
+  <img src="docs/screenshots/tab-stats.png" width="23%" alt="Statistics">
+  <img src="docs/screenshots/theme-sunset-phone.png" width="23%" alt="Sunset theme: player on top">
+</p>
+
+<sub>Screenshots are rendered from sample data by `flutter test test_visual`.</sub>
+
+## Make it yours
+
+The whole look is data. Themes can recolor the app and also **rearrange it**: here the player sits at
+the top, there it is a panel on the right of a desktop layout.
+
+```json
+{
+  "format": 1,
+  "name": "Ocean",
+  "colors": { "seed": "#0288D1" },
+  "shape": { "radius": 20, "coverRadius": 0.5 },
+  "layout": { "shell": { "column": ["header", "player", "content", "navigation"] } }
+}
+```
+
+Drop the file in the themes folder (Settings, Theme shows where) and save: the app updates instantly.
+Share a theme by sending the JSON or by opening a pull request.
+
+- [docs/THEMING.md](docs/THEMING.md): the full theme format and examples
+- [docs/UI.md](docs/UI.md): how the UI code is organized, for changing more than a theme can
+- [themes/](themes): the bundled themes, which double as examples
+
+![Terminal theme on desktop: rail left, player panel right](docs/screenshots/theme-terminal-desktop.png)
 
 ## How it works
 
@@ -91,11 +125,13 @@ sudo pacman -S clang cmake ninja gtk3 mpv
 
 ```bash
 flutter analyze
-flutter test
+flutter test                # unit and layout tests
+flutter test test_visual    # screenshots of every theme, in build/screenshots/
 ```
 
-Tests cover cross-device merging, stats, recommendations, the cache, and the Bot API client
-(against a local fake server that mirrors the real behavior).
+Tests cover cross-device merging, stats, recommendations, the cache, the Bot API client (against a
+local fake server that mirrors the real behavior), the theme format, and where the UI puts things
+for different layouts.
 
 ## Project layout
 
@@ -108,8 +144,13 @@ Tests cover cross-device merging, stats, recommendations, the cache, and the Bot
 | `lib/recommender.dart` | Recommendations |
 | `lib/stats.dart` | Listening log and aggregates |
 | `lib/cache_manager.dart` | Least-recently-used cache eviction |
-| `lib/screens/` | Screens |
-| `test/` | Tests, including the fake Bot API |
+| `lib/ui/theme/` | Theme format, design tokens, theme loading |
+| `lib/ui/components/` | Reusable UI building blocks |
+| `lib/ui/screens/` | Screens |
+| `themes/` | Bundled themes and examples |
+| `docs/` | Theming and UI guides, theme JSON schema, screenshots |
+| `test/` | Tests, including the fake Bot API and layout tests |
+| `test_visual/` | Renders screens and themes to images, no device needed |
 
 > The project used to be called TeleMusic. The Dart package name (`telemusic`), the app id and the
 > index file name (`telemusic_library.json`) are unchanged on purpose, so existing settings and
