@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/kuanysh228/chattunes/actions/workflows/ci.yml/badge.svg)](https://github.com/kuanysh228/chattunes/actions/workflows/ci.yml)
 ![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Linux](https://img.shields.io/badge/Linux-supported-success)
 ![Android](https://img.shields.io/badge/Android-not%20built%20yet-lightgrey)
 
@@ -131,3 +132,7 @@ Tests cover cross-device merging, stats, recommendations, the cache, and the Bot
   that also turns a Telegram channel into a music library, with a much larger feature set.
   ChatTunes differs in using a bot token instead of a user session, running on desktop, and
   keeping everything on-device.
+
+## License
+
+[MIT](LICENSE) © 2026 Kuanysh. Do whatever you want with it, just keep the copyright notice.
