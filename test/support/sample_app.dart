@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:telemusic/library_store.dart';
 import 'package:telemusic/models.dart';
@@ -34,10 +36,31 @@ class SampleApp {
     ('Cassette Summer', 'Juniper Kid', 236),
   ];
 
-  static Future<SampleApp> create({String? themeId}) async {
+  /// Writes a generated cover for [id] so screens can show real images.
+  static void _writeCover(Directory covers, String id, int hue) {
+    final image = img.Image(width: 160, height: 160);
+    for (final p in image) {
+      final t = (p.x + p.y) / 320;
+      p
+        ..r = (40 + 180 * ((hue % 3 == 0) ? t : 1 - t)).round()
+        ..g = (60 + 150 * ((hue % 3 == 1) ? t : 0.4)).round()
+        ..b = (90 + 140 * ((hue % 3 == 2) ? t : 1 - t)).round();
+    }
+    File('${covers.path}/$id.jpg')
+        .writeAsBytesSync(Uint8List.fromList(img.encodeJpg(image, quality: 80)));
+  }
+
+  static Future<SampleApp> create({String? themeId, bool covers = false}) async {
     SharedPreferences.setMockInitialValues({'theme': ?themeId});
     final prefs = await SharedPreferences.getInstance();
     final dir = Directory.systemTemp.createTempSync('sample_app');
+
+    if (covers) {
+      final coverDir = Directory('${dir.path}/covers')..createSync(recursive: true);
+      for (final i in [0, 2, 3, 6, 8]) {
+        _writeCover(coverDir, 'u$i', i);
+      }
+    }
 
     final library = LibraryStore();
     await library.initForTest(prefs: prefs, dir: dir);
@@ -64,12 +87,12 @@ class SampleApp {
       playlists: {
         'road': Playlist(
           id: 'road',
-          name: 'Дорога',
+          name: 'Road trip',
           updatedAt: base,
           trackIds: ['u0', 'u2', 'u6', 'u7'],
           offline: true,
         ),
-        'focus': Playlist(id: 'focus', name: 'Фокус', updatedAt: base, trackIds: ['u3', 'u5']),
+        'focus': Playlist(id: 'focus', name: 'Focus', updatedAt: base, trackIds: ['u3', 'u5']),
       },
     );
 
@@ -91,7 +114,7 @@ class SampleApp {
         ));
       }
     }
-    stats.events = events;
+    stats.ownEvents = events;
 
     final settings = AppSettings(prefs);
     final player = PlayerService(library, stats, settings);

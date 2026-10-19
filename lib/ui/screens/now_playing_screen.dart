@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../library_store.dart';
 import '../../player_service.dart';
 import '../components/components.dart';
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 import '../theme/layout_spec.dart';
 
@@ -22,7 +23,7 @@ class NowPlayingScreen extends StatelessWidget {
       builder: (context, _) {
         final track = player.current;
         if (track == null) {
-          return Scaffold(appBar: AppBar(), body: const Center(child: Text('Ничего не играет')));
+          return Scaffold(appBar: AppBar(), body: Center(child: Text(context.l10n.nothingPlaying)));
         }
         final t = context.tokens;
         final layout = t.layout;
@@ -44,7 +45,7 @@ class NowPlayingScreen extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: fav ? 'Убрать из избранного' : 'В избранное',
+              tooltip: fav ? context.l10n.removeFromFavorites : context.l10n.addToFavorites,
               icon: Icon(fav ? Icons.favorite : Icons.favorite_border,
                   color: fav ? t.favorite : null),
               onPressed: () => library.toggleFavorite(track),
@@ -66,15 +67,15 @@ class NowPlayingScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Сейчас играет'),
+            title: Text(context.l10n.nowPlayingTitle),
             actions: [
               IconButton(
-                tooltip: 'В плейлист',
+                tooltip: context.l10n.addToPlaylistTooltip,
                 icon: const Icon(Icons.playlist_add),
                 onPressed: () => showAddToPlaylist(context, library, track),
               ),
               IconButton(
-                tooltip: 'Очередь',
+                tooltip: context.l10n.queueTitle,
                 icon: const Icon(Icons.queue_music),
                 onPressed: () => showQueueSheet(context, player),
               ),

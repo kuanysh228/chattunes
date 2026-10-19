@@ -4,6 +4,7 @@ import '../../library_store.dart';
 import '../../player_service.dart';
 import '../../recommender.dart';
 import '../../stats.dart';
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 import '../components/components.dart';
 
@@ -55,10 +56,11 @@ class _ForYouScreenState extends State<ForYouScreen> {
 
     final lib = widget.library;
     if (lib.tracks.isEmpty) {
-      return const Center(child: Text('Добавь музыку, и здесь появятся рекомендации'));
+      return Center(child: Text(context.l10n.forYouEmpty));
     }
 
     final mix = _rec.mix(limit: 30);
+    final timeMix = _rec.timeMix();
     final forgotten = _rec.forgotten();
     final fresh = _rec.newFromFavoriteArtists();
 
@@ -74,20 +76,20 @@ class _ForYouScreenState extends State<ForYouScreen> {
                 color: Theme.of(context).colorScheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(context.tokens.radius),
               ),
-              child: const Text(
-                'Пока мало данных. Послушай несколько треков до конца, '
-                'и рекомендации подстроятся под тебя.',
-              ),
+              child: Text(context.l10n.forYouColdStart),
             ),
-          _section('Микс дня', mix, trailing: [
+          _section(context.l10n.mixOfTheDay, mix, trailing: [
             IconButton(
-              tooltip: 'Обновить',
+              tooltip: context.l10n.refresh,
               icon: const Icon(Icons.refresh),
               onPressed: _refresh,
             ),
           ]),
-          if (forgotten.isNotEmpty) _section('Давно не слушали', forgotten),
-          if (fresh.isNotEmpty) _section('Новое у любимых исполнителей', fresh),
+          // Only when there is a real habit to show: a mix of two tracks is noise.
+          if (timeMix.length >= 3)
+            _section(dayPartTitle(context.l10n, dayPartOf(DateTime.now().hour)), timeMix),
+          if (forgotten.isNotEmpty) _section(context.l10n.forgottenTitle, forgotten),
+          if (fresh.isNotEmpty) _section(context.l10n.newFromArtistsTitle, fresh),
         ],
       ),
     );
@@ -105,7 +107,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
             children: [
               ...trailing,
               IconButton(
-                tooltip: 'Играть',
+                tooltip: context.l10n.play,
                 icon: const Icon(Icons.play_circle),
                 onPressed: () => widget.player.playContext(tracks, 0, shuffleOn: false),
               ),
@@ -118,7 +120,7 @@ class _ForYouScreenState extends State<ForYouScreen> {
             track: recs[i].track,
             library: widget.library,
             player: widget.player,
-            subtitle: recs[i].reason,
+            subtitle: reasonText(context.l10n, recs[i].reason),
             onTap: () => widget.player.playContext(tracks, i),
           ),
       ],

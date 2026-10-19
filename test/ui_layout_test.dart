@@ -8,6 +8,7 @@ import 'package:telemusic/ui/screens/library_screen.dart';
 import 'package:telemusic/ui/theme/theme_spec.dart';
 
 import 'support/sample_app.dart';
+import 'support/test_app.dart';
 
 void main() {
   late SampleApp app;
@@ -21,7 +22,7 @@ void main() {
     addTearDown(tester.view.reset);
     app.showAsPlaying(1);
     final spec = ThemeSpec.parse(jsonEncode(theme));
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(testApp(
       theme: spec.toThemeData(),
       home: HomeShell(
         library: app.library,
@@ -112,8 +113,8 @@ void main() {
 
     final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
     expect(bar.destinations.length, 2);
-    expect((bar.destinations.first as NavigationDestination).label, 'Статистика');
-    expect(find.text('Плейлисты'), findsNothing);
+    expect((bar.destinations.first as NavigationDestination).label, 'Stats');
+    expect(find.text('Playlists'), findsNothing);
   });
 
   testWidgets('player controls follow the theme order', (tester) async {
@@ -125,10 +126,10 @@ void main() {
     }, phone);
 
     final dock = find.byType(PlayerDock);
-    final next = tester.getCenter(find.descendant(of: dock, matching: find.byTooltip('Следующий')));
+    final next = tester.getCenter(find.descendant(of: dock, matching: find.byTooltip('Next')));
     final play = tester.getCenter(find.descendant(of: dock, matching: find.byIcon(Icons.play_circle_fill)));
     expect(next.dx, lessThan(play.dx));
-    expect(find.descendant(of: dock, matching: find.byTooltip('Предыдущий')), findsNothing);
+    expect(find.descendant(of: dock, matching: find.byTooltip('Previous')), findsNothing);
   });
 
   testWidgets('numbered track rows replace covers', (tester) async {
@@ -161,8 +162,8 @@ void main() {
       },
     }, phone);
 
-    await tester.tap(find.text('Статистика'));
+    await tester.tap(find.text('Stats'));
     await tester.pump();
-    expect(find.text('Минуты по дням'), findsOneWidget);
+    expect(find.text('Minutes per day'), findsOneWidget);
   });
 }

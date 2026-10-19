@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:telemusic/l10n/app_localizations.dart';
 import 'package:telemusic/ui/screens/home_shell.dart';
 import 'package:telemusic/ui/screens/now_playing_screen.dart';
 import 'package:telemusic/ui/screens/playlists_screen.dart';
@@ -21,7 +22,9 @@ import 'package:telemusic/ui/screens/themes_screen.dart';
 import 'package:telemusic/ui/theme/theme_spec.dart';
 
 import '../test/support/sample_app.dart';
+import '../test/support/test_app.dart';
 
+final shotLocale = Locale(Platform.environment['SCREENSHOT_LOCALE'] ?? 'en');
 final outDir = Directory(Platform.environment['SCREENSHOT_DIR'] ?? 'build/screenshots');
 
 Future<void> loadFonts() async {
@@ -52,7 +55,7 @@ void main() {
   });
 
   setUp(() async {
-    app = await SampleApp.create();
+    app = await SampleApp.create(covers: true);
     app.showAsPlaying(0);
   });
   tearDown(() => app.dispose());
@@ -69,13 +72,11 @@ void main() {
     tester.view.devicePixelRatio = ratio;
     addTearDown(tester.view.reset);
 
+    await preloadCovers(tester, app.library);
     await tester.pumpWidget(RepaintBoundary(
       key: key,
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: spec.toThemeData(),
-        home: home(),
-      ),
+      child: testApp(
+          theme: spec.toThemeData(), locale: shotLocale, home: home(), covers: app.library),
     ));
     await tester.pump(const Duration(milliseconds: 1200));
 
@@ -111,20 +112,24 @@ void main() {
 
   testWidgets('tabs of the default theme', (tester) async {
     final spec = bundled('chattunes-dark');
+    final l = await AppLocalizations.delegate.load(shotLocale);
     for (final (tab, label) in [
-      ('foryou', 'Для вас'),
-      ('playlists', 'Плейлисты'),
-      ('stats', 'Статистика'),
+      ('foryou', l.tabForYou),
+      ('playlists', l.tabPlaylists),
+      ('stats', l.tabStats),
     ]) {
       tester.view.physicalSize = const Size(840, 1720);
       tester.view.devicePixelRatio = 2;
+      await preloadCovers(tester, app.library);
       await tester.pumpWidget(RepaintBoundary(
         key: key,
-        child: MaterialApp(debugShowCheckedModeBanner: false, theme: spec.toThemeData(), home: shell()),
+        child: testApp(
+            theme: spec.toThemeData(), locale: shotLocale, home: shell(), covers: app.library),
       ));
       await tester.pump(const Duration(milliseconds: 200));
       await tester.tap(find.text(label).last);
       await tester.pump(const Duration(milliseconds: 1200));
+      await tester.pump(const Duration(milliseconds: 400));
       final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(key));
       final bytes = await tester.runAsync(() async {
         final image = await boundary.toImage(pixelRatio: 1);

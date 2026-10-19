@@ -8,6 +8,7 @@ class Track {
     required this.addedAt,
     this.size,
     this.messageId,
+    this.thumbId,
   });
 
   /// Bot-specific id, valid for getFile as long as the bot lives.
@@ -24,6 +25,9 @@ class Track {
   final int? size;
   final int? messageId;
 
+  /// Cover thumbnail Telegram stored with the audio, if any.
+  final String? thumbId;
+
   String get label => artist.isEmpty ? title : '$artist — $title';
 
   /// Case-insensitive grouping key; empty artists share one bucket.
@@ -38,6 +42,7 @@ class Track {
         'added_at': addedAt,
         if (size != null) 'size': size,
         if (messageId != null) 'message_id': messageId,
+        if (thumbId != null) 'thumb_id': thumbId,
       };
 
   factory Track.fromJson(Map<String, dynamic> j) => Track(
@@ -49,6 +54,7 @@ class Track {
         addedAt: (j['added_at'] as num?)?.toInt() ?? 0,
         size: (j['size'] as num?)?.toInt(),
         messageId: (j['message_id'] as num?)?.toInt(),
+        thumbId: j['thumb_id'] as String?,
       );
 
   /// Builds a track from a Bot API `audio` or `document` object.
@@ -64,6 +70,7 @@ class Track {
       addedAt: addedAt ?? DateTime.now().millisecondsSinceEpoch,
       size: (m['file_size'] as num?)?.toInt(),
       messageId: messageId,
+      thumbId: ((m['thumbnail'] ?? m['thumb']) as Map<String, dynamic>?)?['file_id'] as String?,
     );
   }
 }
@@ -153,11 +160,55 @@ class PlayEvent {
         'done': completed,
       };
 
+  /// Compact form for the shared index: `[trackId, startSec, listenedSec,
+  /// durationSec, completed]`. Seconds are plenty for stats and keep a year of
+  /// listening to a few hundred KB.
+  List<Object> toCompact() => [
+        trackId,
+        at ~/ 1000,
+        (listenedMs / 1000).round(),
+        (durationMs / 1000).round(),
+        completed ? 1 : 0,
+      ];
+
+  factory PlayEvent.fromCompact(List<dynamic> c) => PlayEvent(
+        trackId: c[0] as String,
+        at: (c[1] as num).toInt() * 1000,
+        listenedMs: (c[2] as num).toInt() * 1000,
+        durationMs: (c[3] as num).toInt() * 1000,
+        completed: c[4] == 1,
+      );
+
   factory PlayEvent.fromJson(Map<String, dynamic> j) => PlayEvent(
         trackId: j['id'] as String,
         at: (j['at'] as num).toInt(),
         listenedMs: (j['ms'] as num).toInt(),
         durationMs: (j['dur'] as num?)?.toInt() ?? 0,
         completed: j['done'] as bool? ?? false,
+      );
+}
+
+/// One device's listening log as shared through the index. Only its own device
+/// ever appends to it, so devices never conflict over it.
+///
+/// [epoch] goes up when stats are reset; a higher epoch wins over any amount of
+/// older events, so a reset on one device is not undone by another.
+class DeviceHistory {
+  const DeviceHistory(this.epoch, this.events);
+
+  final int epoch;
+  final List<PlayEvent> events;
+
+  Map<String, dynamic> toJson() => {
+        'epoch': epoch,
+        'events': [for (final e in events) e.toCompact()],
+      };
+
+  factory DeviceHistory.fromJson(Map<String, dynamic> j) => DeviceHistory(
+        (j['epoch'] as num?)?.toInt() ?? 0,
+        [
+          for (final e in (j['events'] as List? ?? []))
+            PlayEvent.fromCompact(e as List<dynamic>)
+        ],
       );
 }

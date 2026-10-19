@@ -5,6 +5,7 @@ import '../../player_service.dart';
 import '../../settings.dart';
 import '../../stats.dart';
 import '../components/components.dart';
+import '../l10n.dart';
 import '../theme/theme_controller.dart';
 import 'themes_screen.dart';
 
@@ -31,6 +32,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   static const _cacheSteps = [256, 512, 1024, 2048, 4096, 8192, 16384];
 
+  String _languageName(BuildContext context, String code) =>
+      code.isEmpty ? context.l10n.languageSystem : (languageNames[code] ?? code);
+
   @override
   Widget build(BuildContext context) {
     final s = widget.settings;
@@ -40,15 +44,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListenableBuilder(
       listenable: s,
       builder: (context, _) => Scaffold(
-        appBar: AppBar(title: const Text('Настройки')),
+        appBar: AppBar(title: Text(context.l10n.settingsTitle)),
         body: ListView(
           children: [
-            const SectionTitle('Внешний вид'),
+            SectionTitle(context.l10n.appearance),
             ListenableBuilder(
               listenable: widget.themes,
               builder: (context, _) => ListTile(
                 leading: const Icon(Icons.palette),
-                title: const Text('Тема'),
+                title: Text(context.l10n.themeTitle),
                 subtitle: Text(widget.themes.selected.title),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
@@ -56,16 +60,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 )),
               ),
             ),
-            const SectionTitle('Воспроизведение'),
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: Text(context.l10n.languageTitle),
+              subtitle: Text(_languageName(context, s.languageCode)),
+              trailing: PopupMenuButton<String>(
+                tooltip: context.l10n.languageTitle,
+                initialValue: s.languageCode,
+                onSelected: s.setLanguage,
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: '', child: Text(context.l10n.languageSystem)),
+                  for (final locale in AppLocalizations.supportedLocales)
+                    PopupMenuItem(
+                      value: locale.languageCode,
+                      child: Text(languageNames[locale.languageCode] ?? locale.languageCode),
+                    ),
+                ],
+              ),
+            ),
+            SectionTitle(context.l10n.playbackSection),
             SwitchListTile(
-              title: const Text('Автопродолжение'),
-              subtitle: const Text('Когда очередь кончается, добавлять рекомендованные треки'),
+              title: Text(context.l10n.autoplay),
+              subtitle: Text(context.l10n.autoplaySub),
               value: s.autoplay,
               onChanged: s.setAutoplay,
             ),
             ListTile(
-              title: const Text('Предзагрузка'),
-              subtitle: Text('Заранее качать следующих треков: ${s.prefetchCount}'),
+              title: Text(context.l10n.prefetch),
+              subtitle: Text(context.l10n.prefetchSub(s.prefetchCount)),
             ),
             Slider(
               value: s.prefetchCount.toDouble(),
@@ -75,13 +97,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: '${s.prefetchCount}',
               onChanged: (v) => s.setPrefetch(v.round()),
             ),
-            const SectionTitle('Кэш'),
+            SectionTitle(context.l10n.cacheSection),
             ListTile(
-              title: const Text('Лимит кэша'),
-              subtitle: Text(
-                '${(s.cacheLimitMb / 1024).toStringAsFixed(s.cacheLimitMb % 1024 == 0 ? 0 : 1)} ГБ'
-                ' · занято ${usedMb.round()} МБ',
-              ),
+              title: Text(context.l10n.cacheLimit),
+              subtitle: Text(context.l10n.cacheUsage(
+                (s.cacheLimitMb / 1024).toStringAsFixed(s.cacheLimitMb % 1024 == 0 ? 0 : 1),
+                usedMb.round(),
+              )),
             ),
             Slider(
               value: step.toDouble(),
@@ -91,45 +113,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (v) => s.setCacheLimitMb(_cacheSteps[v.round()]),
             ),
             SwitchListTile(
-              title: const Text('Избранное всегда офлайн'),
-              subtitle: const Text('Скачивать и не удалять избранные треки из кэша'),
+              title: Text(context.l10n.favoritesOffline),
+              subtitle: Text(context.l10n.favoritesOfflineSub),
               value: s.favoritesOffline,
               onChanged: s.setFavoritesOffline,
             ),
             ListTile(
               leading: const Icon(Icons.cleaning_services),
-              title: const Text('Очистить кэш'),
-              subtitle: const Text('Офлайн-треки и текущая очередь останутся'),
+              title: Text(context.l10n.clearCache),
+              subtitle: Text(context.l10n.clearCacheSub),
               onTap: () {
                 widget.player.cache.clear(protectedIds: widget.player.protectedIds());
                 setState(() {});
               },
             ),
-            const SectionTitle('Данные'),
+            SectionTitle(context.l10n.dataSection),
             ListTile(
               leading: const Icon(Icons.history),
-              title: const Text('Сбросить статистику'),
-              subtitle: const Text('Удалит историю прослушиваний на этом устройстве'),
+              title: Text(context.l10n.resetStats),
+              subtitle: Text(context.l10n.resetStatsSub),
               onTap: () async {
                 final ok = await confirm(
                   context,
-                  title: 'Сбросить статистику?',
-                  text: 'Рекомендации тоже начнутся с нуля.',
-                  action: 'Сбросить',
+                  title: context.l10n.resetStatsTitle,
+                  text: context.l10n.resetStatsBody,
+                  action: context.l10n.reset,
                 );
-                if (ok) await widget.stats.clear();
+                if (ok) await widget.library.resetHistory();
               },
+            ),
+            if (widget.player.systemMediaControls)
+              ListTile(
+                leading: const Icon(Icons.keyboard_command_key),
+                title: Text(context.l10n.mediaKeysOn),
+              ),
+            ListTile(
+              leading: Icon(widget.library.vault.isSecure ? Icons.lock : Icons.lock_open),
+              title: Text(widget.library.vault.isSecure
+                  ? context.l10n.tokenStoredSecurely
+                  : context.l10n.tokenStoredPlain),
             ),
             ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Отключить канал'),
-              subtitle: const Text('Библиотека в канале останется'),
+              title: Text(context.l10n.disconnect),
+              subtitle: Text(context.l10n.disconnectSub),
               onTap: () async {
                 final ok = await confirm(
                   context,
-                  title: 'Отключить канал?',
-                  text: 'Локальный список будет очищен. В канале всё останется.',
-                  action: 'Отключить',
+                  title: context.l10n.disconnectTitle,
+                  text: context.l10n.disconnectBody,
+                  action: context.l10n.disconnect,
                 );
                 if (ok) {
                   await widget.library.disconnect();

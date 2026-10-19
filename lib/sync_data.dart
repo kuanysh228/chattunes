@@ -13,10 +13,12 @@ class SyncData {
     Map<String, int>? removed,
     Map<String, Fav>? favorites,
     Map<String, Playlist>? playlists,
+    Map<String, DeviceHistory>? history,
   })  : tracks = {for (final t in tracks) t.uniqueId: t},
         removed = removed ?? {},
         favorites = favorites ?? {},
-        playlists = playlists ?? {};
+        playlists = playlists ?? {},
+        history = history ?? {};
 
   final Map<String, Track> tracks;
 
@@ -24,6 +26,15 @@ class SyncData {
   final Map<String, int> removed;
   final Map<String, Fav> favorites;
   final Map<String, Playlist> playlists;
+
+  /// Listening logs by device id.
+  final Map<String, DeviceHistory> history;
+
+  /// Devices with nothing to say (no events, never reset) are left out of the file.
+  Map<String, DeviceHistory> get _sharedHistory => {
+        for (final e in history.entries)
+          if (e.value.events.isNotEmpty || e.value.epoch > 0) e.key: e.value,
+      };
 
   List<Track> get sortedTracks => tracks.values.toList()
     ..sort((a, b) {
@@ -60,13 +71,42 @@ class SyncData {
       if (mine == null || p.updatedAt > mine.updatedAt) playlists[id] = p;
     });
 
+    final history = {...a.history};
+    b.history.forEach((id, h) {
+      final mine = history[id];
+      if (mine == null ||
+          h.epoch > mine.epoch ||
+          (h.epoch == mine.epoch && h.events.length > mine.events.length)) {
+        history[id] = h;
+      }
+    });
+
     return SyncData(
       tracks: tracks.values,
       removed: removed,
       favorites: favorites,
       playlists: playlists,
+      history: history,
     );
   }
+
+  /// A copy with [deviceId]'s history set to [h]. Everything else is shared.
+  SyncData withHistory(String deviceId, DeviceHistory h) => SyncData(
+        tracks: tracks.values,
+        removed: removed,
+        favorites: favorites,
+        playlists: playlists,
+        history: {...history, deviceId: h},
+      );
+
+  /// A copy without [deviceId]'s history.
+  SyncData withoutHistory(String deviceId) => SyncData(
+        tracks: tracks.values,
+        removed: removed,
+        favorites: favorites,
+        playlists: playlists,
+        history: {...history}..remove(deviceId),
+      );
 
   Map<String, dynamic> toJson() => {
         'version': 2,
@@ -76,6 +116,9 @@ class SyncData {
             {for (final e in favorites.entries) e.key: e.value.toJson()}),
         'playlists': SplayTreeMap<String, dynamic>.of(
             {for (final e in playlists.entries) e.key: e.value.toJson()}),
+        if (_sharedHistory.isNotEmpty)
+          'history': SplayTreeMap<String, dynamic>.of(
+              {for (final e in _sharedHistory.entries) e.key: e.value.toJson()}),
       };
 
   /// Deterministic encoding: equal data always produces equal strings.
@@ -99,6 +142,10 @@ class SyncData {
       playlists: {
         for (final e in ((j['playlists'] as Map?) ?? {}).entries)
           e.key as String: Playlist.fromJson(e.value as Map<String, dynamic>)
+      },
+      history: {
+        for (final e in ((j['history'] as Map?) ?? {}).entries)
+          e.key as String: DeviceHistory.fromJson(e.value as Map<String, dynamic>)
       },
     );
   }

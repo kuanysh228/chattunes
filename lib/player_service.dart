@@ -2,18 +2,19 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
 
 import 'cache_manager.dart';
 import 'library_store.dart';
+import 'media_target.dart';
 import 'models.dart';
 import 'recommender.dart';
 import 'settings.dart';
 import 'stats.dart';
 import 'telegram_api.dart';
 
-enum QueueRepeat { off, all, one }
+export 'media_target.dart' show QueueRepeat;
 
 /// Time spent on one track since it started, used to build a [PlayEvent].
 class _Listen {
@@ -26,7 +27,7 @@ class _Listen {
 
 /// Queue, playback, caching and listening log in one place, because they all
 /// react to the same events (track changed, skipped, finished).
-class PlayerService extends ChangeNotifier {
+class PlayerService extends ChangeNotifier with WidgetsBindingObserver implements MediaTarget {
   PlayerService(this.library, this.stats, this.settings)
       : cache = CacheManager(library.cacheDir) {
     _player.playerStateStream.listen(_onPlayerState);
@@ -40,25 +41,57 @@ class PlayerService extends ChangeNotifier {
   final CacheManager cache;
   final AudioPlayer _player = AudioPlayer();
   final Map<String, Future<File>> _inflight = {};
-  final Map<String, String> errors = {};
+  /// Last download error per track. The UI turns these into translated text.
+  final Map<String, Object> errors = {};
   final Random _random = Random();
 
   List<Track> queue = [];
   List<Track> _original = [];
   int index = -1;
+  @override
   bool shuffle = false;
+  @override
   QueueRepeat repeat = QueueRepeat.off;
   bool loading = false;
 
+  /// True when media keys and the system player widget are connected.
+  bool systemMediaControls = false;
+
   _Listen? _listen;
+  Timer? _checkpointTimer;
   int _token = 0;
   int _completedToken = -1;
   Timer? _offlineTimer;
   bool _offlineRunning = false;
 
   AudioPlayer get player => _player;
+
+  @override
   bool get playing => _player.playing;
+
+  @override
   Track? get current => index >= 0 && index < queue.length ? queue[index] : null;
+
+  @override
+  File? coverFor(Track track) => library.coverFor(track);
+
+  @override
+  Duration get position => _player.position;
+
+  @override
+  Duration? get duration => _player.duration;
+
+  @override
+  bool get canGoNext =>
+      index + 1 < queue.length || repeat == QueueRepeat.all || settings.autoplay;
+
+  @override
+  bool get canGoPrevious => index > 0 || _player.position > const Duration(seconds: 3);
+
+  final StreamController<Duration> _seeks = StreamController<Duration>.broadcast();
+
+  @override
+  Stream<Duration> get seeks => _seeks.stream;
 
   bool isCached(Track t) => library.cachedFile(t).existsSync();
   bool isDownloading(Track t) => _inflight.containsKey(t.uniqueId);
@@ -73,7 +106,8 @@ class PlayerService extends ChangeNotifier {
       notifyListeners();
       try {
         if ((t.size ?? 0) > TelegramApi.downloadLimit) {
-          throw TelegramException('Файл больше 20 МБ, Bot API не отдаст его');
+          throw TelegramException('The file is over 20 MB, the Bot API will not serve it',
+              kind: TelegramErrorKind.fileTooBig);
         }
         await library.api!.download(t.fileId, file);
         errors.remove(t.uniqueId);
@@ -83,7 +117,7 @@ class PlayerService extends ChangeNotifier {
         );
         return file;
       } catch (e) {
-        errors[t.uniqueId] = '$e';
+        errors[t.uniqueId] = e;
         rethrow;
       } finally {
         _inflight.remove(t.uniqueId);
@@ -183,6 +217,17 @@ class PlayerService extends ChangeNotifier {
     ]..shuffle(_random);
     queue = [cur, ...rest];
     index = 0;
+  }
+
+  @override
+  void setShuffle(bool on) {
+    if (shuffle != on) toggleShuffle();
+  }
+
+  @override
+  void setRepeat(QueueRepeat mode) {
+    repeat = mode;
+    notifyListeners();
   }
 
   void toggleShuffle() {
@@ -287,6 +332,7 @@ class PlayerService extends ChangeNotifier {
       if (token != _token) return;
       loading = false;
       _listen = _Listen(t);
+      _startCheckpoints();
       notifyListeners();
       unawaited(_player.play());
       _syncWatch();
@@ -347,11 +393,13 @@ class PlayerService extends ChangeNotifier {
     }
   }
 
+  @override
   Future<void> next() async {
     await _finishListen(completed: false);
     await _advance();
   }
 
+  @override
   Future<void> previous() async {
     if (_player.position > const Duration(seconds: 3)) {
       await _player.seek(Duration.zero);
@@ -364,6 +412,27 @@ class PlayerService extends ChangeNotifier {
     }
   }
 
+  @override
+  Future<void> play() async {
+    if (current == null) return toggle();
+    await _player.play();
+    notifyListeners();
+  }
+
+  @override
+  Future<void> pause() async {
+    await _player.pause();
+    notifyListeners();
+  }
+
+  @override
+  Future<void> stop() async {
+    await _player.pause();
+    await _player.seek(Duration.zero);
+    notifyListeners();
+  }
+
+  @override
   Future<void> toggle() async {
     if (current == null) {
       final all = library.tracks.reversed.toList();
@@ -374,31 +443,65 @@ class PlayerService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> seek(Duration d) => _player.seek(d);
+  @override
+  Future<void> seek(Duration d) async {
+    await _player.seek(d);
+    _seeks.add(d);
+  }
+
+  PlayEvent _eventFor(_Listen l, {required bool completed}) => PlayEvent(
+        trackId: l.track.uniqueId,
+        at: l.startedAt,
+        listenedMs: l.watch.elapsedMilliseconds,
+        durationMs: l.track.duration * 1000,
+        completed: completed,
+      );
 
   Future<void> _finishListen({required bool completed}) async {
     final l = _listen;
     _listen = null;
+    _checkpointTimer?.cancel();
     if (l == null) return;
     l.watch.stop();
-    final ms = l.watch.elapsedMilliseconds;
     // Sub-second blips are accidental taps, not listening.
-    if (ms < 1000 && !completed) return;
-    await stats.record(PlayEvent(
-      trackId: l.track.uniqueId,
-      at: l.startedAt,
-      listenedMs: ms,
-      durationMs: l.track.duration * 1000,
-      completed: completed,
-    ));
+    if (l.watch.elapsedMilliseconds < StatsStore.minLoggedMs && !completed) return;
+    await stats.record(_eventFor(l, completed: completed));
+  }
+
+  /// While a track plays, its progress is saved every few seconds, so closing
+  /// the window or a crash still counts what was heard.
+  void _startCheckpoints() {
+    _checkpointTimer?.cancel();
+    _checkpointTimer = Timer.periodic(const Duration(seconds: 10), (_) => saveCheckpoint());
+  }
+
+  /// Writes the current listen to disk. Also called when the app is backgrounded.
+  void saveCheckpoint() {
+    final l = _listen;
+    if (l == null || l.watch.elapsedMilliseconds < StatsStore.minLoggedMs) return;
+    unawaited(stats.checkpoint(_eventFor(l, completed: false)));
+  }
+
+  /// Hooks into app lifecycle. Call once from main, after the binding exists.
+  void attachLifecycle() => WidgetsBinding.instance.addObserver(this);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    saveCheckpoint();
+    // Going to the background is a good moment to share what was listened to.
+    unawaited(library.refresh(forceHistory: true));
   }
 
   @override
   void dispose() {
     _offlineTimer?.cancel();
+    _checkpointTimer?.cancel();
+    saveCheckpoint();
     library.removeListener(_scheduleOffline);
     settings.removeListener(_scheduleOffline);
     unawaited(_finishListen(completed: false));
+    _seeks.close();
     _player.dispose();
     super.dispose();
   }

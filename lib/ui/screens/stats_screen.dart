@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../library_store.dart';
 import '../../stats.dart';
 import '../components/components.dart';
-import '../format.dart';
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 
 enum _Range { week, month, all }
@@ -38,7 +38,7 @@ class _StatsScreenState extends State<StatsScreen> {
     };
 
     if (widget.stats.events.isEmpty) {
-      return const Center(child: Text('Статистика появится после первых прослушиваний'));
+      return Center(child: Text(context.l10n.statsEmpty));
     }
 
     final topTracks = view.topTracks(5);
@@ -50,10 +50,10 @@ class _StatsScreenState extends State<StatsScreen> {
         Padding(
           padding: EdgeInsets.all(context.tokens.pad),
           child: SegmentedButton<_Range>(
-            segments: const [
-              ButtonSegment(value: _Range.week, label: Text('7 дней')),
-              ButtonSegment(value: _Range.month, label: Text('30 дней')),
-              ButtonSegment(value: _Range.all, label: Text('Всё время')),
+            segments: [
+              ButtonSegment(value: _Range.week, label: Text(context.l10n.range7)),
+              ButtonSegment(value: _Range.month, label: Text(context.l10n.range30)),
+              ButtonSegment(value: _Range.all, label: Text(context.l10n.rangeAll)),
             ],
             selected: {_range},
             onSelectionChanged: (s) => setState(() => _range = s.first),
@@ -65,22 +65,25 @@ class _StatsScreenState extends State<StatsScreen> {
             spacing: context.tokens.gap + 4,
             runSpacing: context.tokens.gap + 4,
             children: [
-              StatCard(label: 'Слушали', value: fmtSpent(view.totalMs)),
-              StatCard(label: 'Прослушиваний', value: '${view.plays}'),
-              StatCard(label: 'Серия дней', value: '$streak'),
+              StatCard(label: context.l10n.statListened, value: fmtSpent(context.l10n, view.totalMs)),
+              StatCard(label: context.l10n.statPlays, value: '${view.plays}'),
+              StatCard(label: context.l10n.statStreak, value: '$streak'),
               StatCard(
-                label: 'Пропусков',
+                label: context.l10n.statSkips,
                 value: '${(view.skipRate * 100).round()}%',
               ),
             ],
           ),
         ),
-        SectionTitle(_range == _Range.week ? 'Минуты по дням' : 'Минуты по дням (30 дней)'),
+        SectionTitle(_range == _Range.week
+            ? context.l10n.minutesPerDay
+            : context.l10n.minutesPerDay30),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: context.tokens.pad),
           child: SizedBox(
             height: 120,
             child: BarChart(
+              unit: context.l10n.unitMinutes,
               values: StatsView(widget.stats.events, widget.library.trackById)
                   .minutesPerDay(days),
               color: context.tokens.chartPrimary,
@@ -92,12 +95,13 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
           ),
         ),
-        const SectionTitle('Когда вы слушаете'),
+        SectionTitle(context.l10n.whenYouListen),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: context.tokens.pad),
           child: SizedBox(
             height: 100,
             child: BarChart(
+              unit: context.l10n.unitMinutes,
               values: view.minutesByHour(),
               color: context.tokens.chartSecondary,
               labelOf: (i) => '$i',
@@ -106,23 +110,23 @@ class _StatsScreenState extends State<StatsScreen> {
           ),
         ),
         if (topTracks.isNotEmpty) ...[
-          const SectionTitle('Топ треков'),
+          SectionTitle(context.l10n.topTracks),
           for (var i = 0; i < topTracks.length; i++)
             ListTile(
               leading: Cover(track: topTracks[i].track),
               title: Text(topTracks[i].track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text(topTracks[i].track.artist),
-              trailing: Text('${topTracks[i].plays} ×'),
+              trailing: Text(context.l10n.playsTimes(topTracks[i].plays)),
             ),
         ],
         if (topArtists.isNotEmpty) ...[
-          const SectionTitle('Топ исполнителей'),
+          SectionTitle(context.l10n.topArtists),
           for (var i = 0; i < topArtists.length; i++)
             ListTile(
               leading: CircleAvatar(child: Text('${i + 1}')),
               title: Text(topArtists[i].name),
-              subtitle: Text(fmtSpent(topArtists[i].listenedMs)),
-              trailing: Text('${topArtists[i].plays} ×'),
+              subtitle: Text(fmtSpent(context.l10n, topArtists[i].listenedMs)),
+              trailing: Text(context.l10n.playsTimes(topArtists[i].plays)),
             ),
         ],
       ],

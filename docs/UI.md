@@ -53,6 +53,9 @@ Screens import one file, `components/components.dart`.
    `Wrap`, `Expanded` and `Flexible` instead of fixed-width rows. The layout tests catch overflow.
 4. **Components take data, not services, where they can.** Prefer a presentational component and a thin
    connected wrapper.
+5. **No text in widgets.** Use `context.l10n.someKey` and add the string to the `.arb` files, see
+   [LOCALIZATION.md](LOCALIZATION.md). A test fails on hardcoded Cyrillic, and the translation tests fail
+   if a language is missing a key.
 
 ## Recipes
 
@@ -88,7 +91,7 @@ flutter test                  # includes layout tests that check where things en
 flutter test test_visual      # renders screens and every theme to build/screenshots/
 ```
 
-`test_visual` runs the real screens on sample data (`test/support/sample_app.dart`) with no Telegram
+`test_visual` renders in English; set `SCREENSHOT_LOCALE=ru` for another language. It runs the real screens on sample data (`test/support/sample_app.dart`) with no Telegram
 and no audio device, so you can see a change on several themes and screen sizes in seconds. It uses
 fonts from the Flutter SDK. Shadows render as dark outlines in this tool, which does not happen in the
 app.

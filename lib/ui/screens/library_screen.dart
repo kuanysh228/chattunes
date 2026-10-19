@@ -4,17 +4,18 @@ import '../../library_store.dart';
 import '../../models.dart';
 import '../../player_service.dart';
 import '../../stats.dart';
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 import '../components/components.dart';
 
 enum _Sort { newest, title, artist, mostPlayed }
 
-const _sortLabels = {
-  _Sort.newest: 'Сначала новые',
-  _Sort.title: 'По названию',
-  _Sort.artist: 'По исполнителю',
-  _Sort.mostPlayed: 'Чаще слушаемые',
-};
+String _sortLabel(AppLocalizations l, _Sort s) => switch (s) {
+      _Sort.newest => l.sortNewest,
+      _Sort.title => l.sortTitle,
+      _Sort.artist => l.sortArtist,
+      _Sort.mostPlayed => l.sortMostPlayed,
+    };
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({
@@ -82,9 +83,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Padding(
             padding: EdgeInsets.fromLTRB(context.tokens.pad, context.tokens.gap, context.tokens.pad, 0),
             child: TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Поиск по названию и исполнителю',
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: context.l10n.searchHint,
                 border: InputBorder.none,
               ),
               onChanged: (v) => setState(() => _query = v),
@@ -99,27 +100,28 @@ class _LibraryScreenState extends State<LibraryScreen> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 FilterChip(
-                  label: const Text('Избранное'),
+                  label: Text(context.l10n.favoritesFilter),
                   avatar: const Icon(Icons.favorite, size: 16),
                   selected: _onlyFavorites,
                   onSelected: (v) => setState(() => _onlyFavorites = v),
                 ),
                 PopupMenuButton<_Sort>(
-                  tooltip: 'Сортировка',
+                  tooltip: context.l10n.sortTooltip,
                   icon: const Icon(Icons.sort),
                   initialValue: _sort,
                   onSelected: (v) => setState(() => _sort = v),
                   itemBuilder: (_) => [
-                    for (final e in _sortLabels.entries)
-                      PopupMenuItem(value: e.key, child: Text(e.value)),
+                    for (final s in _Sort.values)
+                      PopupMenuItem(value: s, child: Text(_sortLabel(context.l10n, s))),
                   ],
                 ),
                 if (tracks.isNotEmpty) ...[
-                  Text('${tracks.length} треков', style: Theme.of(context).textTheme.bodySmall),
+                  Text(context.l10n.trackCount(tracks.length),
+                      style: Theme.of(context).textTheme.bodySmall),
                   TextButton.icon(
                     onPressed: () => widget.player.playContext(tracks, 0, shuffleOn: true),
                     icon: const Icon(Icons.shuffle, size: 18),
-                    label: const Text('Перемешать'),
+                    label: Text(context.l10n.shuffle),
                   ),
                 ],
               ],
@@ -129,8 +131,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
             child: tracks.isEmpty
                 ? Center(
                     child: Text(lib.tracks.isEmpty
-                        ? 'Пока пусто. Добавь треки кнопкой + или кинь их в канал.'
-                        : 'Ничего не найдено'),
+                        ? context.l10n.libraryEmpty
+                        : context.l10n.nothingFound),
                   )
                 : ListView.builder(
                     itemCount: tracks.length,
@@ -147,7 +149,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: lib.busy ? null : lib.pickAndUpload,
-        tooltip: 'Добавить треки',
+        tooltip: context.l10n.addTracksTooltip,
         child: const Icon(Icons.add),
       ),
     );

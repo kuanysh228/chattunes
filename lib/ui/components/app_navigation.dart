@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/layout_spec.dart';
+import '../l10n.dart';
 import 'tab_info.dart';
 
 /// Switches between the main tabs. A bar when placed in a column, a rail when
@@ -41,8 +42,8 @@ class AppNavigation extends StatelessWidget {
             NavigationDestination(
               icon: Icon(tabInfo(t).icon),
               selectedIcon: Icon(tabInfo(t).selectedIcon),
-              label: tabInfo(t).title,
-              tooltip: tabInfo(t).title,
+              label: tabTitle(context.l10n, t),
+              tooltip: tabTitle(context.l10n, t),
             ),
         ],
       );
@@ -61,7 +62,7 @@ class AppNavigation extends StatelessWidget {
           NavigationRailDestination(
             icon: Icon(tabInfo(t).icon),
             selectedIcon: Icon(tabInfo(t).selectedIcon),
-            label: Text(tabInfo(t).title),
+            label: Text(tabTitle(context.l10n, t)),
           ),
       ],
     );

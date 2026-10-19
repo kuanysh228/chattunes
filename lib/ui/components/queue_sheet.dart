@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../player_service.dart';
+import '../l10n.dart';
 import 'cover.dart';
 import 'section_title.dart';
 
@@ -16,7 +17,7 @@ void showQueueSheet(BuildContext context, PlayerService player) {
         listenable: player,
         builder: (context, _) => Column(
           children: [
-            const SectionTitle('Очередь'),
+            SectionTitle(context.l10n.queueTitle),
             Expanded(
               child: ReorderableListView.builder(
                 scrollController: scroll,

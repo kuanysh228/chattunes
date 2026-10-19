@@ -1,14 +1,25 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
 import 'sync_data.dart';
 
+enum TelegramErrorKind { api, notAdmin, fileUnavailable, fileTooBig, downloadFailed }
+
+/// A failed Telegram call. [kind] lets the UI show a translated message;
+/// [message] is an English fallback and, for [TelegramErrorKind.api], the
+/// description Telegram itself returned.
 class TelegramException implements Exception {
-  TelegramException(this.message);
+  TelegramException(this.message, {this.kind = TelegramErrorKind.api, this.code});
+
   final String message;
+  final TelegramErrorKind kind;
+
+  /// HTTP status for [TelegramErrorKind.downloadFailed].
+  final int? code;
 
   @override
   String toString() => message;
@@ -61,7 +72,8 @@ class TelegramApi {
       'user_id': me['id'],
     }) as Map<String, dynamic>;
     if (member['status'] != 'administrator' && member['status'] != 'creator') {
-      throw TelegramException('Бот должен быть администратором канала');
+      throw TelegramException('The bot must be an administrator of the chat',
+          kind: TelegramErrorKind.notAdmin);
     }
   }
 
@@ -104,11 +116,23 @@ class TelegramApi {
   }
 
   /// Uploads a local audio file to the channel and returns the stored track.
-  Future<Track> sendAudio(File file, {String? title, String? performer}) async {
+  Future<Track> sendAudio(
+    File file, {
+    String? title,
+    String? performer,
+    int? duration,
+    Uint8List? thumbnail,
+  }) async {
     final req = http.MultipartRequest('POST', _method('sendAudio'))
       ..fields['chat_id'] = chatId
       ..fields['disable_notification'] = 'true'
       ..files.add(await http.MultipartFile.fromPath('audio', file.path));
+    if (duration != null && duration > 0) req.fields['duration'] = '$duration';
+    if (thumbnail != null) {
+      // Telegram wants a thumbnail as a separate upload, referenced by name.
+      req.fields['thumbnail'] = 'attach://cover';
+      req.files.add(http.MultipartFile.fromBytes('cover', thumbnail, filename: 'cover.jpg'));
+    }
     if (title != null && title.isNotEmpty) req.fields['title'] = title;
     if (performer != null && performer.isNotEmpty) req.fields['performer'] = performer;
     final res = await http.Response.fromStream(await req.send());
@@ -131,7 +155,7 @@ class TelegramApi {
   Future<Uri> fileUrl(String fileId) async {
     final file = await _call('getFile', {'file_id': fileId}) as Map<String, dynamic>;
     final path = file['file_path'] as String?;
-    if (path == null) throw TelegramException('Файл недоступен');
+    if (path == null) throw TelegramException('File unavailable', kind: TelegramErrorKind.fileUnavailable);
     return Uri.parse('$host/file/bot$token/$path');
   }
 
@@ -143,7 +167,8 @@ class TelegramApi {
     try {
       final res = await client.send(http.Request('GET', url));
       if (res.statusCode != 200) {
-        throw TelegramException('Скачивание не удалось (${res.statusCode})');
+        throw TelegramException('Download failed (${res.statusCode})',
+            kind: TelegramErrorKind.downloadFailed, code: res.statusCode);
       }
       final tmp = File('${target.path}.part');
       final sink = tmp.openWrite();
@@ -163,12 +188,25 @@ class TelegramApi {
   // ---- library index, stored as a pinned JSON document in the channel ----
 
   /// Reads the pinned index. Returns null if the channel has none yet.
-  Future<({SyncData data, int messageId})?> fetchIndex() async {
+  ///
+  /// Every edit of the pinned message changes at least one of its file id,
+  /// file unique id and edit time. If their combination still equals
+  /// [knownVersion], the download is skipped and `data` is null, which means
+  /// "same as last time".
+  Future<({SyncData? data, int messageId, String version})?> fetchIndex({
+    String? knownVersion,
+  }) async {
     final chat = await getChat();
     final pinned = chat['pinned_message'] as Map<String, dynamic>?;
     final doc = pinned?['document'] as Map<String, dynamic>?;
     if (pinned == null || doc == null || doc['file_name'] != indexFileName) {
       return null;
+    }
+    final messageId = pinned['message_id'] as int;
+    final version = '${doc['file_id']}|${doc['file_unique_id']}|'
+        '${pinned['edit_date'] ?? pinned['date']}';
+    if (version == knownVersion) {
+      return (data: null, messageId: messageId, version: version);
     }
     final url = await fileUrl(doc['file_id'] as String);
     final res = await http.get(url);
@@ -176,7 +214,8 @@ class TelegramApi {
     return (
       data: SyncData.fromJson(
           jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>),
-      messageId: pinned['message_id'] as int,
+      messageId: messageId,
+      version: version,
     );
   }
 

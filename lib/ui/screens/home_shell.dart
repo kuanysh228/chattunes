@@ -5,6 +5,7 @@ import '../../player_service.dart';
 import '../../settings.dart';
 import '../../stats.dart';
 import '../components/components.dart';
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 import '../theme/layout_spec.dart';
 import '../theme/theme_controller.dart';
@@ -69,7 +70,7 @@ class _HomeShellState extends State<HomeShell> {
           case ShellRegion.header:
             return AppHeader(
               axis: across,
-              title: tabInfo(tab).title,
+              title: tabTitle(context.l10n, tab),
               busy: widget.library.busy,
               onSync: widget.library.refresh,
               onSettings: _openSettings,
@@ -117,13 +118,14 @@ class _HomeShellState extends State<HomeShell> {
           AppTab.library =>
             LibraryScreen(library: lib, player: widget.player, stats: widget.stats),
           AppTab.forYou => ForYouScreen(library: lib, player: widget.player, stats: widget.stats),
-          AppTab.playlists => PlaylistsScreen(library: lib, player: widget.player),
+          AppTab.playlists =>
+            PlaylistsScreen(library: lib, player: widget.player, stats: widget.stats),
           AppTab.stats => StatsScreen(library: lib, stats: widget.stats),
         };
 
     return Column(
       children: [
-        if (lib.status != null) StatusBanner(lib.status!),
+        if (lib.status != null) StatusBanner(statusText(context.l10n, lib.status!)),
         Expanded(
           child: IndexedStack(
             index: tabs.indexOf(tab),

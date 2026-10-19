@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../library_store.dart';
+import '../l10n.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key, required this.library});
@@ -15,7 +16,7 @@ class _SetupScreenState extends State<SetupScreen> {
   final _token = TextEditingController();
   final _chat = TextEditingController();
   bool _checking = false;
-  String? _error;
+  Object? _error;
 
   Future<void> _connect() async {
     setState(() {
@@ -25,7 +26,7 @@ class _SetupScreenState extends State<SetupScreen> {
     try {
       await widget.library.connect(_token.text, _chat.text);
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -41,7 +42,7 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ChatTunes')),
+      appBar: AppBar(title: Text(context.l10n.appName)),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -49,34 +50,29 @@ class _SetupScreenState extends State<SetupScreen> {
             padding: const EdgeInsets.all(16),
             shrinkWrap: true,
             children: [
-              Text('Подключение', style: Theme.of(context).textTheme.headlineSmall),
+              Text(context.l10n.connectTitle, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 8),
-              const Text(
-                '1. Создай бота у @BotFather и скопируй токен.\n'
-                '2. Создай канал и добавь бота админом '
-                '(публикация, закрепление и удаление сообщений).\n'
-                '3. Укажи @username канала или его числовой id.',
-              ),
+              Text(context.l10n.setupSteps),
               const SizedBox(height: 16),
               TextField(
                 controller: _token,
-                decoration: const InputDecoration(
-                  labelText: 'Токен бота',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: context.l10n.botToken,
+                  border: const OutlineInputBorder(),
                 ),
                 obscureText: true,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _chat,
-                decoration: const InputDecoration(
-                  labelText: 'Канал (@name или -100…)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: context.l10n.chatField,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                Text(errorText(context.l10n, _error!), style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
               const SizedBox(height: 16),
               FilledButton(
@@ -87,7 +83,7 @@ class _SetupScreenState extends State<SetupScreen> {
                         width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Подключить'),
+                    : Text(context.l10n.connect),
               ),
             ],
           ),

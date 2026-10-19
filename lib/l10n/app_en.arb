@@ -1,0 +1,262 @@
+{
+  "@@locale": "en",
+  "appName": "ChatTunes",
+  "cancel": "Cancel",
+  "done": "Done",
+  "ok": "OK",
+  "delete": "Delete",
+  "open": "Open",
+  "play": "Play",
+  "pause": "Pause",
+  "shuffle": "Shuffle",
+  "rename": "Rename",
+  "name": "Name",
+  "refresh": "Refresh",
+  "tabLibrary": "Library",
+  "tabForYou": "For you",
+  "tabPlaylists": "Playlists",
+  "tabStats": "Stats",
+  "syncTooltip": "Sync",
+  "settingsTitle": "Settings",
+  "previous": "Previous",
+  "next": "Next",
+  "repeat": "Repeat",
+  "addToFavorites": "Add to favorites",
+  "removeFromFavorites": "Remove from favorites",
+  "queueTitle": "Queue",
+  "nothingPlaying": "Nothing playing",
+  "nowPlayingTitle": "Now playing",
+  "addToPlaylistTooltip": "Add to playlist",
+  "trackActions": "Actions",
+  "playNext": "Play next",
+  "addToQueue": "Add to queue",
+  "addToPlaylistMenu": "Add to playlist…",
+  "removeFromLibrary": "Remove from library",
+  "deleteTrackTitle": "Delete track?",
+  "deleteTrackBody": "“{title}” will disappear from the library on all devices and from the chat.",
+  "@deleteTrackBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "searchHint": "Search by title or artist",
+  "favoritesFilter": "Favorites",
+  "sortTooltip": "Sort",
+  "sortNewest": "Newest first",
+  "sortTitle": "By title",
+  "sortArtist": "By artist",
+  "sortMostPlayed": "Most played",
+  "libraryEmpty": "Nothing here yet. Add tracks with the + button or post them in the chat.",
+  "nothingFound": "Nothing found",
+  "addTracksTooltip": "Add tracks",
+  "trackCount": "{count, plural, =0{No tracks} =1{1 track} other{{count} tracks}}",
+  "@trackCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "favorites": "Favorites",
+  "newPlaylist": "New playlist",
+  "playlistName": "Playlist name",
+  "playlistsEmpty": "No playlists yet. Create one with the + button or add a track via the “Add to playlist…” menu.",
+  "playlistDeleted": "Playlist deleted",
+  "deletePlaylistAction": "Delete playlist",
+  "deletePlaylistTitle": "Delete playlist?",
+  "deletePlaylistBody": "The tracks stay in your library.",
+  "offline": "Offline",
+  "removeFromPlaylist": "Remove from playlist",
+  "nothingHereYet": "Nothing here yet",
+  "smartPlaylists": "Smart playlists",
+  "forYouEmpty": "Add some music and recommendations will show up here",
+  "forYouColdStart": "Not much data yet. Listen to a few tracks to the end and recommendations will adapt to you.",
+  "mixOfTheDay": "Daily mix",
+  "forgottenTitle": "Haven’t heard in a while",
+  "newFromArtistsTitle": "New from artists you love",
+  "timeMixMorning": "Your morning",
+  "timeMixDay": "Your afternoon",
+  "timeMixEvening": "Your evening",
+  "timeMixNight": "Your night",
+  "reasonFavoriteArtist": "favorite artist",
+  "reasonOftenPlayed": "you play it often",
+  "reasonFavorite": "in your favorites",
+  "reasonAfterThis": "often plays after this track",
+  "reasonTimeOfDay": "fits this time of day",
+  "reasonNew": "new in your library",
+  "reasonSimilar": "like what you love",
+  "reasonNotPlayedDays": "{days, plural, one{not played for {days} day} other{not played for {days} days}}",
+  "@reasonNotPlayedDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "reasonNewFromArtist": "new from {artist}",
+  "@reasonNewFromArtist": {
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
+  "reasonTimeMix": "you often play it around now",
+  "smartTopMonth": "Most played this month",
+  "smartRecentlyAdded": "Recently added",
+  "smartNeverPlayed": "Never played",
+  "smartLoved": "Loved the most",
+  "smartSkipped": "Often skipped",
+  "statsEmpty": "Stats will appear after your first listens",
+  "range7": "7 days",
+  "range30": "30 days",
+  "rangeAll": "All time",
+  "statListened": "Listened",
+  "statPlays": "Plays",
+  "statStreak": "Day streak",
+  "statSkips": "Skips",
+  "minutesPerDay": "Minutes per day",
+  "minutesPerDay30": "Minutes per day (30 days)",
+  "whenYouListen": "When you listen",
+  "topTracks": "Top tracks",
+  "topArtists": "Top artists",
+  "unitMinutes": "min",
+  "durationMinutes": "{minutes} min",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHours": "{hours} h",
+  "@durationHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHoursMinutes": "{hours} h {minutes} min",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "playsTimes": "{count} ×",
+  "@playsTimes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "connectTitle": "Connect",
+  "setupSteps": "1. Create a bot with @BotFather and copy its token.\n2. Create a channel or group and add the bot as an administrator (post, pin and delete messages).\n3. Enter the chat’s @username or its numeric id.",
+  "botToken": "Bot token",
+  "chatField": "Chat (@name or -100…)",
+  "connect": "Connect",
+  "appearance": "Appearance",
+  "themeTitle": "Theme",
+  "languageTitle": "Language",
+  "languageSystem": "System default",
+  "playbackSection": "Playback",
+  "autoplay": "Autoplay",
+  "autoplaySub": "When the queue ends, keep playing recommended tracks",
+  "prefetch": "Prefetch",
+  "prefetchSub": "{count, plural, =0{Don’t download ahead} =1{Download 1 upcoming track ahead} other{Download {count} upcoming tracks ahead}}",
+  "@prefetchSub": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheSection": "Cache",
+  "cacheLimit": "Cache limit",
+  "cacheUsage": "{limit} GB · {used} MB used",
+  "@cacheUsage": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      },
+      "used": {
+        "type": "int"
+      }
+    }
+  },
+  "favoritesOffline": "Keep favorites offline",
+  "favoritesOfflineSub": "Download them and never evict them from the cache",
+  "clearCache": "Clear cache",
+  "clearCacheSub": "Offline tracks and the current queue stay",
+  "dataSection": "Data",
+  "resetStats": "Reset stats",
+  "resetStatsSub": "Deletes the listening history on this device",
+  "resetStatsTitle": "Reset stats?",
+  "resetStatsBody": "Recommendations will start from scratch too.",
+  "reset": "Reset",
+  "disconnect": "Disconnect chat",
+  "disconnectSub": "The library stays in the chat",
+  "disconnectTitle": "Disconnect chat?",
+  "disconnectBody": "The local list will be cleared. Everything stays in the chat.",
+  "tokenStoredSecurely": "The bot token is kept in the system keychain",
+  "tokenStoredPlain": "The bot token is kept in app settings, unencrypted (no system keychain found)",
+  "mediaKeysOn": "Media keys and the system player widget are on",
+  "reloadFiles": "Reload files",
+  "moreTooltip": "More",
+  "importFile": "Import from file…",
+  "pasteClipboard": "Paste from clipboard",
+  "copyCurrentTheme": "Copy current theme (JSON)",
+  "builtInThemes": "Built-in",
+  "myThemes": "My themes",
+  "noUserThemes": "Nothing here yet. Copy the current theme from the menu (⋮), edit the values in the file in the folder above, and the app updates by itself.",
+  "clipboardEmpty": "The clipboard is empty",
+  "themeCopied": "Theme JSON copied",
+  "themeRejected": "This theme can’t be used",
+  "themeFolderHint": "Themes folder. Drop a .json file here and it shows up in the list.",
+  "copyPath": "Copy path",
+  "deleteThemeTitle": "Delete theme?",
+  "deleteThemeBody": "The file “{name}” will be deleted.",
+  "@deleteThemeBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "statusNoConnection": "No connection",
+  "statusUploading": "Uploading {n}/{total}: {name}",
+  "@statusUploading": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "statusSyncing": "Syncing…",
+  "errorNotAdmin": "The bot must be an administrator of the chat",
+  "errorFileUnavailable": "File unavailable",
+  "errorFileTooBig": "The file is over 20 MB, the Bot API won’t serve it",
+  "errorDownloadFailed": "Download failed ({code})",
+  "@errorDownloadFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "defaultPlaylistName": "Playlist"
+}

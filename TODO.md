@@ -2,39 +2,52 @@
 
 Living list of what ChatTunes has and what we want to build. Checked items are done.
 
-## Done (v0.1)
+## Done
 
+**Core**
 - [x] Bot API client: upload, download (streamed, no half-written files), polling, admin check
-- [x] Library synced through a pinned JSON index, edited in place
+- [x] Library synced through a pinned JSON index, edited in place (no "pinned a message" spam in groups)
+- [x] Unchanged index is not downloaded again on every poll
 - [x] Cross-device merge (latest edit wins, removals, re-upload revives)
-- [x] Favorites, playlists (reorder, rename, delete, offline flag)
+- [x] Groups and supergroups as well as channels
+- [x] Tested end to end with two simulated devices on one fake chat, and once against a real bot
+      (`test_real/`, restores the chat afterwards)
+
+**Player**
 - [x] Queue with shuffle, repeat, play next, add to queue, reorder
 - [x] Prefetch of the next tracks, LRU cache limit, offline favorites and playlists
+- [x] Favorites, playlists (reorder, rename, delete, offline flag)
+- [x] Smart playlists: most played this month, recently added, never played, loved the most, often skipped
+- [x] **Tags and cover art** read from the audio file on upload (mp3, flac, m4a, ogg...), cover sent to
+      Telegram as the thumbnail and downloaded by the other devices
+- [x] **Media keys, the desktop player widget and `playerctl`** via MPRIS (Linux), tested on the real session bus
+
+**Stats and recommendations**
 - [x] Listening log and stats screen (day/hour charts, streak, top tracks and artists)
+- [x] A listen cut short by closing the app or a crash is recovered on the next start
+- [x] **Listening history synced between devices**, with a reset that cannot be undone by another device
 - [x] Recommender: daily mix, forgotten favorites, new from liked artists, autoplay radio
-- [x] Groups and supergroups as well as channels
-- [x] Tests incl. a fake Bot API server; verified once against the real Bot API
-- [x] CI: analyze + tests
-- [x] **Theme system**: a theme is one JSON file (colors, shapes, spacing, type scale, covers) and also
-      controls the **layout**: shell tree (player top/side, navigation anywhere), tabs, player controls,
-      Now Playing arrangement, track rows
-- [x] Live reload of theme files, import from file or clipboard, export, error reporting, readability warnings
+- [x] **Time-of-day mixes** learned from when you actually listen
+
+**Privacy and polish**
+- [x] **Bot token in the system keychain**, with an automatic move from the old plain-text setting and a
+      fallback when there is no keychain
+- [x] **Localization**: English and Russian, plurals handled, language picker, [guide for adding more](docs/LOCALIZATION.md)
+- [x] Theme system: one JSON file for colors, shapes, spacing, type scale, covers **and layout**
 - [x] UI split into `lib/ui` (theme, components, screens), JSON schema for themes, [docs](docs)
 - [x] `flutter test test_visual`: renders every screen and theme from sample data, no device needed
+- [x] CI: analyze + tests
 
 ## Next
 
-Things that block calling it a real daily-driver player.
-
-- [ ] **Run the main UI for real.** Layouts are checked in tests and rendered screenshots, but the app has not been driven by hand with a real library
-- [ ] **Verify upload and polling on the real bot** (`sendAudio`, `getUpdates`), not only the fake server
-- [ ] **Media keys and MPRIS on Linux** (play/pause/next from keyboard, desktop widgets)
 - [ ] **Android build**: set up the SDK, background playback and notification controls
-- [ ] **Read real tags** (ID3/Vorbis, embedded cover) on upload instead of guessing from the file name
-- [ ] **Covers**: embedded art, or the audio message thumbnail, instead of the generated placeholder
-- [ ] **Flush the listening log on exit** so a track cut off by closing the app still counts
-- [ ] **Secure token storage** (keychain / libsecret) instead of plain app settings
-- [ ] **Localization**: English and Russian (UI is Russian only today)
+      (the MPRIS code is Linux-only; Android needs `audio_service` or similar behind the same `MediaTarget`)
+- [ ] **Beat the 20 MB limit**: transcode big files on upload, support a self-hosted Bot API server,
+      or add an MTProto backend (TDLib) as an alternative
+- [ ] **Do not lose posts after 24 h offline**: surface a clear notice, and/or make the app the default upload path
+- [ ] **Drag and drop** files onto the window on desktop; per-file upload progress; duplicate detection
+- [ ] **Release builds**: Linux tarball / AppImage attached to GitHub releases from CI
+- [ ] Windows and macOS media controls (SMTC / Now Playing)
 
 ## Soon
 
@@ -49,27 +62,23 @@ Themes and UI:
 
 Everything else:
 
-- [ ] **Beat the 20 MB limit**: transcode big files on upload, support a self-hosted Bot API server,
-      or add an MTProto backend (TDLib) as an alternative
-- [ ] **Sync listening history** between devices so recommendations match everywhere
-- [ ] **Do not lose posts after 24 h offline**: surface a clear notice, and/or make the app the default upload path
-- [ ] **Drag and drop** files onto the window on desktop; per-file upload progress; duplicate detection
-- [ ] **Release builds**: Linux tarball / AppImage attached to GitHub releases from CI
 - [ ] **Large libraries**: check index size and list performance around 5k+ tracks
+- [ ] Cover art for tracks posted by hand that Telegram sent without a thumbnail
 - [ ] Synced lyrics (LRC) when present in tags or an accompanying file
+- [ ] More languages
+- [ ] Read tags again when a file's tags are edited
 
 ## Ideas
 
 - [ ] Sleep timer
 - [ ] Gapless playback and crossfade
 - [ ] Equalizer
-- [ ] Time-of-day mixes ("morning", "workout") learned from habits
 - [ ] "Start radio from this track" in the track menu
-- [ ] Smart playlists (most played this month, recently added, never played)
+- [ ] Mixes by activity ("workout", "focus") if habits show a clear pattern
 - [ ] Import from a folder / another Telegram chat
-- [ ] Windows and macOS builds
 - [ ] Share a library read-only with a friend (token-less invite)
 - [ ] Export / import stats and settings
+- [ ] Undo for deleting a track
 
 ## Known issues
 
@@ -78,3 +87,5 @@ Everything else:
 - Recommendation reasons are heuristic labels, not exact explanations
 - Screens render shadows as dark outlines in `test_visual`; the real app is fine
 - The `$schema` link in docs points at the GitHub raw URL, which only works once the repository is public
+- mpv prints `lavf: Failed to create file cache` once at startup; playback is unaffected so far, but the cause is not tracked down
+- Statistics are rounded to whole seconds when shared between devices

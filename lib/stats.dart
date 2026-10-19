@@ -5,37 +5,137 @@ import 'package:flutter/foundation.dart';
 
 import 'models.dart';
 
-/// Append-only play log kept on this device (one JSON object per line).
+/// Append-only play log kept on this device (one JSON object per line), plus
+/// the logs of the user's other devices, which arrive through the shared index.
 class StatsStore extends ChangeNotifier {
   late final File _file;
-  List<PlayEvent> events = [];
+  late final File _pending;
+  late final File _meta;
 
-  Future<void> init(Directory dir) async {
+  /// Identifies this device's own log in the shared index.
+  String deviceId = 'local';
+
+  /// Goes up when stats are reset, see [DeviceHistory].
+  int epoch = 0;
+
+  /// What this device listened to.
+  List<PlayEvent> ownEvents = [];
+
+  /// Other devices' logs, as last synced.
+  Map<String, DeviceHistory> others = {};
+
+  List<PlayEvent>? _all;
+
+  /// Everything the user listened to, on every device. Stats and
+  /// recommendations are computed from this.
+  List<PlayEvent> get events =>
+      _all ??= [...ownEvents, for (final h in others.values) ...h.events];
+
+  DeviceHistory get ownHistory => DeviceHistory(epoch, ownEvents);
+
+  Future<void> init(Directory dir, {String? deviceId}) async {
+    if (deviceId != null) this.deviceId = deviceId;
     _file = File('${dir.path}/plays.jsonl');
-    if (!await _file.exists()) return;
-    final loaded = <PlayEvent>[];
-    for (final line in await _file.readAsLines()) {
-      if (line.trim().isEmpty) continue;
+    _pending = File('${dir.path}/pending_play.json');
+    _meta = File('${dir.path}/stats_meta.json');
+
+    if (await _meta.exists()) {
       try {
-        loaded.add(PlayEvent.fromJson(jsonDecode(line) as Map<String, dynamic>));
+        epoch = ((jsonDecode(await _meta.readAsString()) as Map)['epoch'] as num).toInt();
       } catch (_) {
-        // A torn last line after a crash must not lose the rest of the history.
+        epoch = 0;
       }
     }
-    events = loaded;
+    if (await _file.exists()) {
+      final loaded = <PlayEvent>[];
+      for (final line in await _file.readAsLines()) {
+        if (line.trim().isEmpty) continue;
+        try {
+          loaded.add(PlayEvent.fromJson(jsonDecode(line) as Map<String, dynamic>));
+        } catch (_) {
+          // A torn last line after a crash must not lose the rest of the history.
+        }
+      }
+      ownEvents = loaded;
+    }
+    _all = null;
+    await _recoverPending();
   }
+
+  /// A track that was still playing when the app died or was closed leaves a
+  /// checkpoint behind. Turn it into a normal event on the next start.
+  Future<void> _recoverPending() async {
+    if (!await _pending.exists()) return;
+    try {
+      final e = PlayEvent.fromJson(jsonDecode(await _pending.readAsString()) as Map<String, dynamic>);
+      final alreadyLogged = ownEvents.any((x) => x.trackId == e.trackId && x.at == e.at);
+      if (!alreadyLogged && e.listenedMs >= minLoggedMs) await record(e);
+    } catch (_) {
+      // A half-written checkpoint is not worth failing startup for.
+    }
+    if (await _pending.exists()) await _pending.delete();
+  }
+
+  /// Listening shorter than this is an accidental tap, not a listen.
+  static const minLoggedMs = 1000;
+
+  /// Saves the track currently playing, so closing the app loses at most the
+  /// last few seconds.
+  Future<void> checkpoint(PlayEvent partial) =>
+      _pending.writeAsString(jsonEncode(partial.toJson()), flush: true);
 
   Future<void> record(PlayEvent e) async {
-    events = [...events, e];
+    ownEvents = [...ownEvents, e];
+    _all = null;
     notifyListeners();
     await _file.writeAsString('${jsonEncode(e.toJson())}\n', mode: FileMode.append);
+    // The finished event supersedes any checkpoint of the same listen.
+    if (await _pending.exists()) await _pending.delete();
   }
 
-  Future<void> clear() async {
-    events = [];
-    if (await _file.exists()) await _file.delete();
+  /// Takes in the logs from the shared index. Other devices' logs replace what
+  /// we had; our own log is only touched if another device reset stats, which
+  /// shows as a higher epoch for our id.
+  Future<void> applyRemote(Map<String, DeviceHistory> all) async {
+    final mine = all[deviceId];
+    if (mine != null && mine.epoch > epoch) {
+      epoch = mine.epoch;
+      ownEvents = [...mine.events];
+      await _rewriteOwn();
+    }
+    others = {
+      for (final e in all.entries)
+        if (e.key != deviceId) e.key: e.value,
+    };
+    _all = null;
     notifyListeners();
   }
+
+  /// Wipes the history on every device: [newEpoch] must be above every epoch in
+  /// the index, and is then written for all devices by the caller.
+  Future<void> reset(int newEpoch) async {
+    epoch = newEpoch;
+    ownEvents = [];
+    others = {for (final e in others.entries) e.key: DeviceHistory(newEpoch, const [])};
+    _all = null;
+    if (await _file.exists()) await _file.delete();
+    if (await _pending.exists()) await _pending.delete();
+    await _writeMeta();
+    notifyListeners();
+  }
+
+  /// Epoch to use for a reset: one above anything seen so far.
+  int nextEpoch(Iterable<DeviceHistory> known) =>
+      [epoch, for (final h in known) h.epoch].reduce((a, b) => a > b ? a : b) + 1;
+
+  Future<void> _rewriteOwn() async {
+    await _file.writeAsString(
+      [for (final e in ownEvents) jsonEncode(e.toJson())].join('\n') + (ownEvents.isEmpty ? '' : '\n'),
+    );
+    await _writeMeta();
+  }
+
+  Future<void> _writeMeta() => _meta.writeAsString(jsonEncode({'epoch': epoch}));
 }
 
 class TopTrack {

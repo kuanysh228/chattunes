@@ -5,6 +5,7 @@ export 'app_header.dart';
 export 'app_navigation.dart';
 export 'bar_chart.dart';
 export 'cover.dart';
+export 'cover_scope.dart';
 export 'dialogs.dart';
 export 'player_controls.dart';
 export 'player_dock.dart';

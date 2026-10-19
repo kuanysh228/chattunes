@@ -174,4 +174,115 @@ void main() {
 
     expect(firstFour.length, 2);
   });
+
+  group('time of day', () {
+    final tracks = [
+      track('morning1', 'Dawn'),
+      track('morning2', 'Dawn'),
+      track('morning3', 'Dawn'),
+      track('evening1', 'Dusk'),
+      track('evening2', 'Dusk'),
+      track('mixed', 'Both'),
+      track('fresh', 'Dawn'),
+    ];
+
+    List<PlayEvent> playsAt(String id, int hour, int n) =>
+        [for (var i = 0; i < n; i++) listen(id, daysAgo: 2 + i, hour: hour)];
+
+    test('day parts split the clock sensibly', () {
+      expect(dayPartOf(5), DayPart.morning);
+      expect(dayPartOf(10), DayPart.morning);
+      expect(dayPartOf(11), DayPart.day);
+      expect(dayPartOf(17), DayPart.evening);
+      expect(dayPartOf(22), DayPart.evening);
+      expect(dayPartOf(23), DayPart.night);
+      expect(dayPartOf(3), DayPart.night);
+    });
+
+    test('morning mix holds what you play in the morning, not the evening favorites', () {
+      final events = [
+        ...playsAt('morning1', 8, 6),
+        ...playsAt('morning2', 9, 4),
+        ...playsAt('evening1', 20, 8),
+        ...playsAt('evening2', 21, 8),
+      ];
+      final rec = build(tracks, events);
+      final mix = rec.timeMix(at: DateTime(2026, 10, 19, 8));
+      final ids = [for (final r in mix) r.track.uniqueId];
+
+      expect(ids, containsAll(['morning1', 'morning2']));
+      expect(ids, isNot(contains('evening1')));
+      expect(ids, isNot(contains('evening2')));
+      expect(mix.first.reason.kind, RecReasonKind.timeMix);
+    });
+
+    test('the same history gives a different mix in the evening', () {
+      final events = [
+        ...playsAt('morning1', 8, 6),
+        ...playsAt('evening1', 20, 8),
+        ...playsAt('evening2', 21, 5),
+      ];
+      final rec = build(tracks, events);
+      final ids = [for (final r in rec.timeMix(at: DateTime(2026, 10, 19, 20))) r.track.uniqueId];
+
+      expect(ids, containsAll(['evening1', 'evening2']));
+      expect(ids, isNot(contains('morning1')));
+    });
+
+    test('a track played at every hour belongs to no particular time', () {
+      final events = [
+        ...playsAt('mixed', 8, 2),
+        ...playsAt('mixed', 14, 2),
+        ...playsAt('mixed', 20, 2),
+        ...playsAt('morning1', 8, 5),
+      ];
+      final ids = [for (final r in build(tracks, events).timeMix(at: DateTime(2026, 10, 19, 8))) r.track.uniqueId];
+
+      expect(ids, contains('morning1'));
+      expect(ids, isNot(contains('mixed')));
+    });
+
+    test('one-off plays are too little to call a habit', () {
+      final events = playsAt('morning1', 8, 1);
+      final mix = build(tracks, events).timeMix(at: DateTime(2026, 10, 19, 8));
+      expect(mix.map((r) => r.track.uniqueId), isNot(contains('morning1')));
+    });
+
+    test('unplayed tracks of an artist you only play in the morning are suggested after the habits', () {
+      final events = [
+        ...playsAt('morning1', 8, 4),
+        ...playsAt('morning2', 9, 4),
+      ];
+      final ids = [for (final r in build(tracks, events).timeMix(at: DateTime(2026, 10, 19, 8))) r.track.uniqueId];
+
+      expect(ids, contains('fresh'));
+      expect(ids.indexOf('fresh'), greaterThan(ids.indexOf('morning1')));
+    });
+
+    test('something you just heard is not offered again', () {
+      final now = DateTime(2026, 10, 19, 8, 30);
+      final events = [
+        ...playsAt('morning1', 8, 5),
+        PlayEvent(
+          trackId: 'morning1',
+          at: now.subtract(const Duration(minutes: 30)).millisecondsSinceEpoch,
+          listenedMs: 200000,
+          durationMs: 200000,
+          completed: true,
+        ),
+      ];
+      final rec = Recommender(
+        tracks: tracks,
+        events: events,
+        favorites: const {},
+        now: now,
+        random: Random(1),
+      );
+      expect(rec.timeMix(at: now).map((r) => r.track.uniqueId), isNot(contains('morning1')));
+    });
+
+    test('no history means no time mix', () {
+      expect(build(tracks, []).timeMix(at: DateTime(2026, 10, 19, 8)), isEmpty);
+    });
+  });
 }

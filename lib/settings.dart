@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppSettings extends ChangeNotifier {
@@ -6,7 +6,8 @@ class AppSettings extends ChangeNotifier {
       : prefetchCount = _prefs.getInt('prefetch') ?? 2,
         cacheLimitMb = _prefs.getInt('cache_mb') ?? 2048,
         autoplay = _prefs.getBool('autoplay') ?? true,
-        favoritesOffline = _prefs.getBool('fav_offline') ?? false;
+        favoritesOffline = _prefs.getBool('fav_offline') ?? false,
+        languageCode = _prefs.getString('language') ?? '';
 
   final SharedPreferences _prefs;
 
@@ -19,6 +20,12 @@ class AppSettings extends ChangeNotifier {
 
   /// Keep every favorite downloaded.
   bool favoritesOffline;
+
+  /// `''` follows the system language; otherwise a language code such as `en`.
+  String languageCode;
+
+  /// Null means "use the system language".
+  Locale? get locale => languageCode.isEmpty ? null : Locale(languageCode);
 
   int get cacheLimitBytes => cacheLimitMb * 1024 * 1024;
 
@@ -38,6 +45,12 @@ class AppSettings extends ChangeNotifier {
     autoplay = v;
     notifyListeners();
     await _prefs.setBool('autoplay', v);
+  }
+
+  Future<void> setLanguage(String code) async {
+    languageCode = code;
+    notifyListeners();
+    await _prefs.setString('language', code);
   }
 
   Future<void> setFavoritesOffline(bool v) async {

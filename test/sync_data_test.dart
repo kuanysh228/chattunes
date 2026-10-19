@@ -84,4 +84,59 @@ void main() {
     expect(back.playlists['p']!.trackIds, ['b', 'a']);
     expect(back.playlists['p']!.offline, isTrue);
   });
+
+  group('listening history', () {
+    PlayEvent ev(String id, int at) => PlayEvent(
+          trackId: id,
+          at: at * 1000,
+          listenedMs: 60000,
+          durationMs: 200000,
+          completed: true,
+        );
+
+    test('the longer log of a device wins, so appends are never lost', () {
+      final shorter = SyncData(history: {'d1': DeviceHistory(0, [ev('a', 1)])});
+      final longer = SyncData(history: {'d1': DeviceHistory(0, [ev('a', 1), ev('b', 2)])});
+
+      expect(SyncData.merge(shorter, longer).history['d1']!.events.length, 2);
+      expect(SyncData.merge(longer, shorter).history['d1']!.events.length, 2);
+    });
+
+    test('a higher epoch (a reset) beats any amount of older events', () {
+      final old = SyncData(history: {'d1': DeviceHistory(0, [ev('a', 1), ev('b', 2), ev('c', 3)])});
+      final reset = SyncData(history: {'d1': const DeviceHistory(1, [])});
+
+      expect(SyncData.merge(old, reset).history['d1']!.events, isEmpty);
+      expect(SyncData.merge(reset, old).history['d1']!.events, isEmpty);
+    });
+
+    test('different devices keep separate logs', () {
+      final a = SyncData(history: {'d1': DeviceHistory(0, [ev('a', 1)])});
+      final b = SyncData(history: {'d2': DeviceHistory(0, [ev('b', 2)])});
+
+      expect(SyncData.merge(a, b).history.keys.toSet(), {'d1', 'd2'});
+    });
+
+    test('history survives a JSON round trip and the compact form is seconds-based', () {
+      final data = SyncData(history: {'d1': DeviceHistory(2, [ev('a', 1700000000)])});
+      final back = SyncData.fromJson(data.toJson());
+
+      expect(back.history['d1']!.epoch, 2);
+      expect(back.history['d1']!.events.single.trackId, 'a');
+      expect(back.history['d1']!.events.single.at, 1700000000 * 1000);
+      expect(data.toJson()['history'], isA<Map>());
+    });
+
+    test('an index written by an older version, without history, still loads', () {
+      final d = SyncData.fromJson({'version': 2, 'tracks': []});
+      expect(d.history, isEmpty);
+    });
+
+    test('history changes are visible to canonical comparison', () {
+      final a = SyncData(history: {'d1': DeviceHistory(0, [ev('a', 1)])});
+      final b = SyncData(history: {'d1': DeviceHistory(0, [ev('a', 1), ev('b', 2)])});
+      expect(a.canonical(), isNot(b.canonical()));
+      expect(a.withoutHistory('d1').canonical(), b.withoutHistory('d1').canonical());
+    });
+  });
 }

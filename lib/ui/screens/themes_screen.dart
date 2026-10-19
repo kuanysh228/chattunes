@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../components/components.dart';
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 import '../theme/theme_controller.dart';
 import '../theme/theme_spec.dart';
@@ -23,20 +24,20 @@ class ThemesScreen extends StatelessWidget {
         final t = context.tokens;
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Тема'),
+            title: Text(context.l10n.themeTitle),
             actions: [
               IconButton(
-                tooltip: 'Перечитать файлы',
+                tooltip: context.l10n.reloadFiles,
                 icon: const Icon(Icons.refresh),
                 onPressed: themes.reload,
               ),
               PopupMenuButton<String>(
-                tooltip: 'Ещё',
+                tooltip: context.l10n.moreTooltip,
                 onSelected: (v) => _menu(context, v),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'file', child: Text('Импорт из файла…')),
-                  PopupMenuItem(value: 'paste', child: Text('Вставить из буфера обмена')),
-                  PopupMenuItem(value: 'copy', child: Text('Скопировать текущую (JSON)')),
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'file', child: Text(context.l10n.importFile)),
+                  PopupMenuItem(value: 'paste', child: Text(context.l10n.pasteClipboard)),
+                  PopupMenuItem(value: 'copy', child: Text(context.l10n.copyCurrentTheme)),
                 ],
               ),
             ],
@@ -45,16 +46,13 @@ class ThemesScreen extends StatelessWidget {
             padding: EdgeInsets.only(bottom: t.pad * 2),
             children: [
               _FolderHint(path: themes.dir.path),
-              const SectionTitle('Встроенные'),
+              SectionTitle(context.l10n.builtInThemes),
               _Grid(themes: themes, entries: themes.builtins),
-              const SectionTitle('Мои темы'),
+              SectionTitle(context.l10n.myThemes),
               if (themes.userThemes.isEmpty)
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: t.pad),
-                  child: const Text(
-                    'Пока пусто. Скопируй текущую тему в меню (⋮), поправь значения в файле '
-                    'в папке выше, и приложение обновится само.',
-                  ),
+                  child: Text(context.l10n.noUserThemes),
                 )
               else
                 _Grid(themes: themes, entries: themes.userThemes),
@@ -80,13 +78,13 @@ class ThemesScreen extends StatelessWidget {
           final data = await Clipboard.getData(Clipboard.kTextPlain);
           final text = data?.text;
           if (text == null || text.trim().isEmpty) {
-            if (context.mounted) _snack(context, 'В буфере обмена пусто');
+            if (context.mounted) _snack(context, context.l10n.clipboardEmpty);
             return;
           }
           await themes.import(text);
         case 'copy':
           await Clipboard.setData(ClipboardData(text: themes.exportSelected()));
-          if (context.mounted) _snack(context, 'JSON темы скопирован');
+          if (context.mounted) _snack(context, context.l10n.themeCopied);
       }
     } on ThemeFormatException catch (e) {
       if (context.mounted) await _showErrors(context, e.errors);
@@ -100,7 +98,7 @@ class ThemesScreen extends StatelessWidget {
 Future<void> _showErrors(BuildContext context, List<String> errors) => showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Тема не подходит'),
+        title: Text(context.l10n.themeRejected),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,7 +106,7 @@ Future<void> _showErrors(BuildContext context, List<String> errors) => showDialo
             children: [for (final e in errors) Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('• $e'))],
           ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Ок'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.ok))],
       ),
     );
 
@@ -135,13 +133,13 @@ class _FolderHint extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Папка тем. Положи сюда .json и тема появится в списке.'),
+                Text(context.l10n.themeFolderHint),
                 SelectableText(path, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
           IconButton(
-            tooltip: 'Скопировать путь',
+            tooltip: context.l10n.copyPath,
             icon: const Icon(Icons.copy),
             onPressed: () => Clipboard.setData(ClipboardData(text: path)),
           ),
@@ -257,9 +255,9 @@ class _ThemeCard extends StatelessWidget {
   Future<void> _delete(BuildContext context) async {
     final ok = await confirm(
       context,
-      title: 'Удалить тему?',
-      text: 'Файл «${entry.title}» будет удалён.',
-      action: 'Удалить',
+      title: context.l10n.deleteThemeTitle,
+      text: context.l10n.deleteThemeBody(entry.title),
+      action: context.l10n.delete,
     );
     if (ok) await themes.delete(entry);
   }

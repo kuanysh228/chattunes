@@ -2,12 +2,48 @@ import 'dart:math';
 
 import 'models.dart';
 
+/// Part of the day, used for mixes that match when you usually listen to something.
+enum DayPart { morning, day, evening, night }
+
+DayPart dayPartOf(int hour) {
+  if (hour >= 5 && hour < 11) return DayPart.morning;
+  if (hour >= 11 && hour < 17) return DayPart.day;
+  if (hour >= 17 && hour < 23) return DayPart.evening;
+  return DayPart.night;
+}
+
+enum RecReasonKind {
+  favoriteArtist,
+  oftenPlayed,
+  favorite,
+  afterThis,
+  timeOfDay,
+  newInLibrary,
+  similar,
+  notPlayedDays,
+  newFromArtist,
+  timeMix,
+}
+
+/// Why a track was suggested. Data rather than text so the UI can translate it.
+class RecReason {
+  const RecReason(this.kind, {this.days, this.artist});
+
+  final RecReasonKind kind;
+
+  /// For [RecReasonKind.notPlayedDays].
+  final int? days;
+
+  /// For [RecReasonKind.newFromArtist].
+  final String? artist;
+}
+
 class Rec {
   const Rec(this.track, this.score, this.reason);
 
   final Track track;
   final double score;
-  final String reason;
+  final RecReason reason;
 }
 
 /// Content-free recommender: it only knows what the user played, skipped and
@@ -38,6 +74,8 @@ class Recommender {
   final Map<String, int> _playCount = {};
   final Map<String, List<int>> _trackHours = {};
   final Map<String, List<int>> _artistHours = {};
+  final Map<String, List<int>> _trackParts = {};
+  final Map<String, List<int>> _artistParts = {};
   final Map<String, Map<String, int>> _next = {};
   double _maxTrack = 0;
   double _maxArtist = 0;
@@ -74,8 +112,10 @@ class Recommender {
         _lastPlayed[t.uniqueId] = max(_lastPlayed[t.uniqueId] ?? 0, e.at);
         final hour = DateTime.fromMillisecondsSinceEpoch(e.at).hour;
         (_trackHours[t.uniqueId] ??= List.filled(24, 0))[hour]++;
+        (_trackParts[t.uniqueId] ??= List.filled(4, 0))[dayPartOf(hour).index]++;
         if (t.artistKey.isNotEmpty) {
           (_artistHours[t.artistKey] ??= List.filled(24, 0))[hour]++;
+          (_artistParts[t.artistKey] ??= List.filled(4, 0))[dayPartOf(hour).index]++;
         }
 
         // Two counted plays within half an hour belong to one listening session.
@@ -116,7 +156,7 @@ class Recommender {
   }
 
   /// Returns the score together with the factor that contributed most.
-  (double, String) _score(Track t, Track? seed) {
+  (double, RecReason) _score(Track t, Track? seed) {
     final artistN = _norm(_artistWeight[t.artistKey] ?? 0, _maxArtist);
     final trackN = _norm(_trackWeight[t.uniqueId] ?? 0, _maxTrack);
     final fav = favorites.contains(t.uniqueId) ? 1.0 : 0.0;
@@ -129,12 +169,12 @@ class Recommender {
       if (maxRow > 0) trans = (row![t.uniqueId] ?? 0) / maxRow;
     }
 
-    final parts = <String, double>{
-      'любимый исполнитель': 0.35 * artistN,
-      'часто слушаете': 0.25 * trackN,
-      'в избранном': 0.20 * fav,
-      'часто играет после этого трека': 0.45 * trans,
-      'под это время суток': 0.10 * hourN,
+    final parts = <RecReasonKind, double>{
+      RecReasonKind.favoriteArtist: 0.35 * artistN,
+      RecReasonKind.oftenPlayed: 0.25 * trackN,
+      RecReasonKind.favorite: 0.20 * fav,
+      RecReasonKind.afterThis: 0.45 * trans,
+      RecReasonKind.timeOfDay: 0.10 * hourN,
     };
 
     var score = parts.values.fold(0.0, (a, b) => a + b);
@@ -149,18 +189,18 @@ class Recommender {
     }
 
     var reason = parts.entries.reduce((a, b) => a.value >= b.value ? a : b);
-    var reasonText = reason.value > 0.02 ? reason.key : 'новое в вашей библиотеке';
+    var why = RecReason(reason.value > 0.02 ? reason.key : RecReasonKind.newInLibrary);
 
     // Never played, but the artist is liked: worth surfacing.
     if (!_playCount.containsKey(t.uniqueId) && artistN > 0.3) {
       score += 0.15;
-      if (parts['часто играет после этого трека']! < 0.05) {
-        reasonText = 'похоже на то, что вы любите';
+      if (parts[RecReasonKind.afterThis]! < 0.05) {
+        why = const RecReason(RecReasonKind.similar);
       }
     }
 
     score += _random.nextDouble() * 0.05;
-    return (score, reasonText);
+    return (score, why);
   }
 
   /// Greedy re-rank: a small penalty per already-picked track of the same
@@ -205,7 +245,12 @@ class Recommender {
       final fresh = [...tracks]..sort((a, b) => b.addedAt.compareTo(a.addedAt));
       return [
         for (final t in fresh.take(limit))
-          Rec(t, 0, favorites.contains(t.uniqueId) ? 'в избранном' : 'новое в вашей библиотеке')
+          Rec(
+              t,
+              0,
+              RecReason(favorites.contains(t.uniqueId)
+                  ? RecReasonKind.favorite
+                  : RecReasonKind.newInLibrary))
       ];
     }
     return _diversify(_rank(tracks, seed), limit);
@@ -229,6 +274,38 @@ class Recommender {
     return _diversify(ranked, limit);
   }
 
+  /// Tracks you usually play at this time of day, learned from your own habits:
+  /// a track qualifies when most of its plays fall in the same part of the day.
+  /// Unplayed tracks by artists you mostly play at this time are added after them.
+  List<Rec> timeMix({DateTime? at, int limit = 20}) {
+    final part = dayPartOf((at ?? DateTime.fromMillisecondsSinceEpoch(_now)).hour).index;
+    final out = <Rec>[];
+
+    for (final t in tracks) {
+      if (_hoursSincePlayed(t) < 6) continue; // not something you just heard
+
+      final plays = _trackParts[t.uniqueId];
+      final total = plays?.fold(0, (a, b) => a + b) ?? 0;
+      if (plays != null && total >= 2) {
+        final share = plays[part] / total;
+        if (share >= 0.6) {
+          out.add(Rec(t, share * min(total, 6) / 6 + 0.01 * total, const RecReason(RecReasonKind.timeMix)));
+        }
+        continue;
+      }
+
+      // Never (or barely) played: lean on the artist's habits.
+      final artist = _artistParts[t.artistKey];
+      final artistTotal = artist?.fold(0, (a, b) => a + b) ?? 0;
+      if (artist != null && artistTotal >= 4 && total == 0 && artist[part] / artistTotal >= 0.7) {
+        out.add(Rec(t, 0.3 * artist[part] / artistTotal, const RecReason(RecReasonKind.timeMix)));
+      }
+    }
+
+    out.sort((a, b) => b.score.compareTo(a.score));
+    return _diversify(out, limit);
+  }
+
   /// Tracks you loved once and haven't heard for a while.
   List<Rec> forgotten({int limit = 15, int minDays = 21}) {
     final out = <Rec>[];
@@ -241,7 +318,8 @@ class Recommender {
       final days = (_now - last) / 86400000;
       if (days < minDays) continue;
       // Loved more and longer ago ranks higher.
-      out.add(Rec(t, plays * log(days + 1), 'не слушали ${days.round()} дн.'));
+      out.add(Rec(t, plays * log(days + 1),
+          RecReason(RecReasonKind.notPlayedDays, days: days.round())));
     }
     out.sort((a, b) => b.score.compareTo(a.score));
     return out.take(limit).toList();
@@ -254,7 +332,7 @@ class Recommender {
       if (_playCount.containsKey(t.uniqueId)) continue;
       final a = _norm(_artistWeight[t.artistKey] ?? 0, _maxArtist);
       if (a < 0.3) continue;
-      out.add(Rec(t, a, 'новое у «${t.artist}»'));
+      out.add(Rec(t, a, RecReason(RecReasonKind.newFromArtist, artist: t.artist)));
     }
     out.sort((a, b) => b.score.compareTo(a.score));
     return out.take(limit).toList();

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../models.dart';
 import '../theme/app_tokens.dart';
+import 'cover_scope.dart';
 
-/// There is no real artwork yet, so a cover is derived from the track id:
-/// a stable color plus the title's first letter. How it looks (gradient,
-/// solid, flat), how round it is and how vivid are all theme tokens.
+/// A track's cover: its artwork when it has one, otherwise a placeholder
+/// derived from the track id (a stable color plus the title's first letter).
+/// The placeholder's look (gradient, solid, flat), how round covers are and how
+/// vivid they are, are all theme tokens.
 class Cover extends StatelessWidget {
   const Cover({super.key, required this.track, this.size = 44});
 
@@ -28,7 +30,7 @@ class Cover extends StatelessWidget {
     final flat = t.coverStyle == CoverStyle.flat;
     final letter = track.title.trim().isEmpty ? '♪' : track.title.trim()[0].toUpperCase();
 
-    return Container(
+    final placeholder = Container(
       width: size,
       height: size,
       alignment: Alignment.center,
@@ -55,6 +57,34 @@ class Cover extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
+    );
+
+    final image = CoverScope.imageFor(context, track);
+    if (image == null) return placeholder;
+
+    // The placeholder stays underneath: it shows while the image decodes and
+    // remains if the file turns out to be unreadable.
+    final px = (size * MediaQuery.devicePixelRatioOf(context)).round();
+    return Stack(
+      children: [
+        placeholder,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(size * t.coverRadius),
+          child: Image(
+            image: ResizeImage(FileImage(image), width: px, height: px),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            frameBuilder: (context, child, frame, sync) => AnimatedOpacity(
+              opacity: frame == null ? 0 : 1,
+              duration: sync ? Duration.zero : const Duration(milliseconds: 150),
+              child: child,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

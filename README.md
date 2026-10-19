@@ -19,13 +19,16 @@ no third-party servers: just your bot and your chat.
 
 | | |
 |---|---|
-| **Library** | Search, sort (newest, title, artist, most played), favorites filter |
+| **Library** | Search, sort (newest, title, artist, most played), favorites filter. Title, artist, duration and **cover art are read from the file's own tags** |
 | **Playlists & favorites** | Create, rename, drag to reorder. Synced across devices |
+| **Smart playlists** | Fill themselves: most played this month, recently added, never played, loved the most, often skipped |
 | **Player** | Draggable queue, shuffle, repeat (off / all / one), play next, mini player |
 | **Prefetch** | The next 1-5 queue items download ahead of time, so skipping never waits |
 | **Offline** | Keep favorites and chosen playlists on the device; cache is capped with LRU eviction |
-| **Stats** | Listening time, plays, day streak, skip rate, charts by day and hour, top tracks and artists |
-| **Recommendations** | Daily mix, "Haven't heard in a while", "New from artists you love", autoplay |
+| **Stats** | Listening time, plays, day streak, skip rate, charts by day and hour, top tracks and artists. **Shared across your devices** |
+| **Recommendations** | Daily mix, a mix for the time of day you usually listen to it, "Haven't heard in a while", "New from artists you love", autoplay |
+| **Desktop integration** | Media keys, the desktop's player widget and `playerctl` work (MPRIS on Linux) |
+| **Languages** | English and Russian, following the system language. [Adding one](docs/LOCALIZATION.md) is a single file |
 | **Themes** | A theme is one JSON file: colors, shapes, and the **layout** itself. Move the player to the top or a side panel, reorder tabs, pick the controls. Edit the file and the app restyles live |
 
 <p>
@@ -56,6 +59,7 @@ Drop the file in the themes folder (Settings, Theme shows where) and save: the a
 Share a theme by sending the JSON or by opening a pull request.
 
 - [docs/THEMING.md](docs/THEMING.md): the full theme format and examples
+- [docs/LOCALIZATION.md](docs/LOCALIZATION.md): adding a language
 - [docs/UI.md](docs/UI.md): how the UI code is organized, for changing more than a theme can
 - [themes/](themes): the bundled themes, which double as examples
 
@@ -79,11 +83,13 @@ flowchart LR
 
 - **Storage** is the audio messages in your chat. The bot downloads them through the Bot API.
 - **Sync** works through a single JSON document pinned in the chat. It holds the library, favorites,
-  playlists and removals. The app edits that message in place, so groups do not fill up with
+  playlists, removals and the listening logs of your devices. The app edits that message in place, so groups do not fill up with
   "pinned a message" service posts.
 - **Conflicts** resolve without a server: the latest edit of each item wins, and a removed track
   stays removed until it is uploaded again.
-- **Stats and recommendations** live on the device only. Your listening history never leaves it.
+- **Stats and recommendations** are computed on your device from your listening history. The history
+  itself travels only through your own chat, between your own devices, so stats and recommendations
+  match everywhere. Resetting stats clears it on every device.
 
 ### How recommendations work
 
@@ -114,23 +120,32 @@ flutter run -d linux           # run
 flutter build linux --release  # build
 ```
 
-Linux needs `clang`, `cmake`, `ninja`, `gtk3` and `mpv` (playback goes through libmpv):
+Linux needs `clang`, `cmake`, `ninja`, `gtk3`, `libsecret` and `mpv` (playback goes through libmpv, and
+the bot token is kept in the system keychain):
 
 ```bash
 # Arch
-sudo pacman -S clang cmake ninja gtk3 mpv
+sudo pacman -S clang cmake ninja gtk3 libsecret mpv
+
+# Debian / Ubuntu
+sudo apt install clang cmake ninja-build libgtk-3-dev libsecret-1-dev libmpv-dev
 ```
 
 ## Tests
 
 ```bash
 flutter analyze
-flutter test                # unit and layout tests
+flutter test                # unit, layout, sync and translation tests
 flutter test test_visual    # screenshots of every theme, in build/screenshots/
 ```
 
-Tests cover cross-device merging, stats, recommendations, the cache, the Bot API client (against a
-local fake server that mirrors the real behavior), the theme format, and where the UI puts things
+Two checks need something from the machine and skip themselves when it is missing: the MPRIS test uses a
+D-Bus session and `playerctl`. And `test_real/` runs against a real bot and chat, only if you provide
+`TG_TOKEN` and `TG_CHAT`; it leaves the chat as it found it.
+
+Tests cover cross-device sync end to end (two simulated devices on one fake chat), merging, stats and
+listening history, recommendations, smart playlists, the cache, tag and cover reading, the keychain
+fallback, MPRIS on the real session bus, the theme format, translations, and where the UI puts things
 for different layouts.
 
 ## Project layout
@@ -141,16 +156,22 @@ for different layouts.
 | `lib/sync_data.dart` | Synced data model and merge rules |
 | `lib/library_store.dart` | Library, favorites, playlists, sync loop |
 | `lib/player_service.dart` | Queue, playback, prefetch, offline, listening log |
-| `lib/recommender.dart` | Recommendations |
+| `lib/recommender.dart` | Recommendations, including time-of-day mixes |
+| `lib/smart_playlists.dart` | Self-filling playlists |
+| `lib/audio_tags.dart` | Reads tags and cover art from audio files |
+| `lib/token_store.dart` | Bot token in the system keychain, with a fallback |
+| `lib/mpris.dart` | Media keys and desktop player widget (Linux) |
 | `lib/stats.dart` | Listening log and aggregates |
 | `lib/cache_manager.dart` | Least-recently-used cache eviction |
 | `lib/ui/theme/` | Theme format, design tokens, theme loading |
 | `lib/ui/components/` | Reusable UI building blocks |
 | `lib/ui/screens/` | Screens |
+| `lib/l10n/` | Translations (`.arb` files) |
 | `themes/` | Bundled themes and examples |
 | `docs/` | Theming and UI guides, theme JSON schema, screenshots |
 | `test/` | Tests, including the fake Bot API and layout tests |
 | `test_visual/` | Renders screens and themes to images, no device needed |
+| `test_real/` | Opt-in checks against a real Telegram bot |
 
 > The project used to be called TeleMusic. The Dart package name (`telemusic`), the app id and the
 > index file name (`telemusic_library.json`) are unchanged on purpose, so existing settings and
@@ -161,11 +182,12 @@ for different layouts.
 - **Files over 20 MB cannot be downloaded.** That is a Bot API limit; such tracks are flagged with an error.
 - If you post tracks into the chat by hand, open the app at least once a day: Telegram keeps
   unprocessed updates for 24 hours. Tracks uploaded through the app are not affected.
-- The bot token is stored on the device in app settings, **unencrypted**.
-  Use a dedicated bot for the player.
-- Stats are not synced, so recommendations differ per device.
-- A listen cut short by closing the app is not recorded.
-- The UI is currently in Russian only.
+- The bot token is kept in the system keychain (GNOME Keyring, KWallet). If there is none, it falls back
+  to the app's settings file, **unencrypted**, and Settings tells you which one is in use. Use a
+  dedicated bot for the player either way.
+- Media keys are Linux-only for now (MPRIS); Android and Windows need their own integration.
+- Listening logs are shared at most every 30 minutes, and when the app goes to the background, so another
+  device can be a little behind on stats.
 
 ## Related projects
 

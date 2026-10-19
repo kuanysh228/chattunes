@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../library_store.dart';
 import '../../player_service.dart';
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 import '../theme/layout_spec.dart';
 import 'cover.dart';
@@ -42,7 +43,7 @@ class PlayerDock extends StatelessWidget {
           elevation: raised ? 3 : 0,
           child: track == null
               ? Center(
-                  child: Text('Ничего не играет', style: Theme.of(context).textTheme.bodySmall),
+                  child: Text(context.l10n.nothingPlaying, style: Theme.of(context).textTheme.bodySmall),
                 )
               : _panel(context, layout),
         ),
@@ -121,7 +122,7 @@ class PlayerDock extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton(onPressed: onOpen, child: const Text('Открыть')),
+            child: TextButton(onPressed: onOpen, child: Text(context.l10n.open)),
           ),
         ],
       ),

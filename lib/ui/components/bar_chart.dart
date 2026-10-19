@@ -8,7 +8,7 @@ class BarChart extends StatelessWidget {
     required this.color,
     required this.labelOf,
     required this.labelEvery,
-    this.unit = 'мин',
+    required this.unit,
   });
 
   final List<double> values;

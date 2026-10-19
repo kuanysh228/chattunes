@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../theme/app_tokens.dart';
 
 /// Screen title with the sync and settings buttons. A strip in a column, a
@@ -26,12 +27,12 @@ class AppHeader extends StatelessWidget {
     final surface = Theme.of(context).colorScheme.surface;
 
     final sync = IconButton(
-      tooltip: 'Синхронизировать',
+      tooltip: context.l10n.syncTooltip,
       icon: const Icon(Icons.sync),
       onPressed: onSync,
     );
     final settings = IconButton(
-      tooltip: 'Настройки',
+      tooltip: context.l10n.settingsTitle,
       icon: const Icon(Icons.settings),
       onPressed: onSettings,
     );

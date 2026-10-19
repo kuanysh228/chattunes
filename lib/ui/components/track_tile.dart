@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../library_store.dart';
 import '../../models.dart';
 import '../../player_service.dart';
+import '../l10n.dart';
 import 'dialogs.dart';
 import 'track_row.dart';
 
@@ -52,25 +53,28 @@ class TrackTile extends StatelessWidget {
       playing: player.current?.uniqueId == track.uniqueId && player.playing,
       favorite: fav,
       cache: _cache,
-      message: player.errors[track.uniqueId],
+      message: player.errors[track.uniqueId] == null
+          ? null
+          : errorText(context.l10n, player.errors[track.uniqueId]!),
       subtitleOverride: subtitle,
       menu: PopupMenuButton<TrackAction>(
-        tooltip: 'Действия',
+        tooltip: context.l10n.trackActions,
         onSelected: (v) => _onAction(context, v),
         itemBuilder: (_) => [
-          const PopupMenuItem(value: TrackAction.playNext, child: Text('Играть далее')),
-          const PopupMenuItem(value: TrackAction.queue, child: Text('В очередь')),
+          PopupMenuItem(value: TrackAction.playNext, child: Text(context.l10n.playNext)),
+          PopupMenuItem(value: TrackAction.queue, child: Text(context.l10n.addToQueue)),
           PopupMenuItem(
             value: TrackAction.favorite,
-            child: Text(fav ? 'Убрать из избранного' : 'В избранное'),
+            child: Text(fav ? context.l10n.removeFromFavorites : context.l10n.addToFavorites),
           ),
-          const PopupMenuItem(value: TrackAction.playlist, child: Text('В плейлист…')),
+          PopupMenuItem(
+              value: TrackAction.playlist, child: Text(context.l10n.addToPlaylistMenu)),
           if (extraLabel != null)
             PopupMenuItem(value: TrackAction.extra, child: Text(extraLabel!)),
           const PopupMenuDivider(),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: TrackAction.remove,
-            child: Text('Удалить из библиотеки'),
+            child: Text(context.l10n.removeFromLibrary),
           ),
         ],
       ),
@@ -92,9 +96,9 @@ class TrackTile extends StatelessWidget {
       case TrackAction.remove:
         final ok = await confirm(
           context,
-          title: 'Удалить трек?',
-          text: '«${track.title}» исчезнет из библиотеки на всех устройствах и из канала.',
-          action: 'Удалить',
+          title: context.l10n.deleteTrackTitle,
+          text: context.l10n.deleteTrackBody(track.title),
+          action: context.l10n.delete,
         );
         if (ok) await library.removeTrack(track);
     }

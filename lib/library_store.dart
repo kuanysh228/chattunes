@@ -1,19 +1,53 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'audio_tags.dart';
 import 'models.dart';
+import 'stats.dart';
 import 'sync_data.dart';
 import 'telegram_api.dart';
+import 'token_store.dart';
+
+enum StatusKind { noConnection, uploading, error }
+
+/// Something the user should know about the sync, kept as data so the UI can
+/// translate it.
+class LibraryStatus {
+  const LibraryStatus.noConnection() : this._(StatusKind.noConnection);
+  const LibraryStatus.uploading(int current, int total, String name)
+      : this._(StatusKind.uploading, current: current, total: total, name: name);
+  const LibraryStatus.error(Object error) : this._(StatusKind.error, error: error);
+
+  const LibraryStatus._(this.kind, {this.current, this.total, this.name, this.error});
+
+  final StatusKind kind;
+  final int? current;
+  final int? total;
+  final String? name;
+  final Object? error;
+}
 
 /// Owns tracks, favorites and playlists, and keeps them in sync with the
 /// pinned index in the Telegram channel.
 class LibraryStore extends ChangeNotifier {
+  /// [apiHost] and [autoSync] exist for tests: a fake Bot API server, and
+  /// calling [refresh] by hand instead of on a timer.
+  LibraryStore({this.apiHost, this.autoSync = true, this.initialVault});
+
+  final String? apiHost;
+  final bool autoSync;
+  final TokenVault? initialVault;
+
+  /// Where the bot token is kept. Built on first use, once [prefs] exists.
+  late final TokenVault vault = initialVault ?? TokenVault(prefs: prefs);
+
   static const _pollInterval = Duration(seconds: 20);
 
   /// Edits are batched so toggling a few hearts is one upload, not several.
@@ -29,14 +63,58 @@ class LibraryStore extends ChangeNotifier {
   SyncData data = SyncData();
   int? _updateOffset;
   int? _indexMessageId;
-  String? status;
+
+  /// Listening logs are shared too, but they only grow, so uploading them on
+  /// every few plays would be wasteful. Alone, they are pushed this rarely.
+  static const historyPushInterval = Duration(minutes: 30);
+
+  StatsStore? stats;
+  String? _deviceId;
+  DateTime _lastPush = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _forceHistoryPush = false;
+
+  /// Names this device's listening log in the shared index.
+  String get deviceId {
+    var id = _deviceId ?? prefs.getString('device_id');
+    if (id == null) {
+      final r = Random.secure();
+      id = List.generate(8, (_) => r.nextInt(36).toRadixString(36)).join();
+      unawaited(prefs.setString('device_id', id));
+    }
+    return _deviceId = id;
+  }
+
+  /// Connects the listening log, so it is synced with the rest of the library.
+  Future<void> attachStats(StatsStore s) async {
+    stats = s;
+    s.deviceId = deviceId;
+    await s.applyRemote(data.history);
+  }
+
+  /// The index as last downloaded, and the version of that file, so an unchanged
+  /// index is not downloaded again on every poll.
+  SyncData? _remoteData;
+  String? _remoteCanonical;
+  String? _remoteCanonicalNoOwn;
+  String? _remoteVersion;
+  LibraryStatus? status;
   bool busy = false;
 
   List<Track>? _tracksCache;
 
+  /// Tracks whose cover image is on disk.
+  final Set<String> _coverIds = {};
+
   bool get configured => api != null;
 
   Directory get cacheDir => Directory('${dir.path}/audio');
+
+  Directory get coversDir => Directory('${dir.path}/covers');
+
+  File _coverFile(String uniqueId) => File('${coversDir.path}/$uniqueId.jpg');
+
+  /// The cover image of [t], or null if it has none (or it is not downloaded yet).
+  File? coverFor(Track t) => _coverIds.contains(t.uniqueId) ? _coverFile(t.uniqueId) : null;
 
   /// Oldest first; UI sorts further as needed.
   List<Track> get tracks => _tracksCache ??= data.sortedTracks;
@@ -59,15 +137,16 @@ class LibraryStore extends ChangeNotifier {
     prefs = await SharedPreferences.getInstance();
     dir = await getApplicationSupportDirectory();
     await cacheDir.create(recursive: true);
+    await _loadCovers();
 
-    final token = prefs.getString('token');
+    final token = await vault.read();
     final chat = prefs.getString('chat');
     _updateOffset = prefs.getInt('offset');
     _indexMessageId = prefs.getInt('index_msg');
     await _loadLocal();
 
     if (token != null && chat != null) {
-      api = TelegramApi(token, chat);
+      api = _newApi(token, chat);
       _startPolling();
     }
   }
@@ -79,6 +158,47 @@ class LibraryStore extends ChangeNotifier {
     this.prefs = prefs;
     this.dir = dir;
     await cacheDir.create(recursive: true);
+    await _loadCovers();
+  }
+
+  Future<void> _loadCovers() async {
+    await coversDir.create(recursive: true);
+    _coverIds
+      ..clear()
+      ..addAll([
+        for (final f in coversDir.listSync().whereType<File>())
+          if (f.path.endsWith('.jpg')) f.uri.pathSegments.last.replaceFirst('.jpg', ''),
+      ]);
+  }
+
+  Future<void>? _coversTask;
+
+  /// Downloads the small cover thumbnails of tracks that have one. They are a
+  /// few KB each, so this simply fetches every missing one in the background.
+  /// Calling it while a run is in progress waits for that run instead of
+  /// starting another.
+  Future<void> syncCovers() {
+    if (api == null) return Future.value();
+    return _coversTask ??= _downloadCovers().whenComplete(() => _coversTask = null);
+  }
+
+  Future<void> _downloadCovers() async {
+    final api = this.api;
+    if (api == null) return;
+    for (final t in tracks) {
+      final id = t.thumbId;
+      if (id == null || _coverIds.contains(t.uniqueId)) continue;
+      try {
+        await api.download(id, _coverFile(t.uniqueId));
+        _coverIds.add(t.uniqueId);
+        notifyListeners();
+      } on SocketException {
+        return; // offline: try again on the next sync
+      } catch (_) {
+        // A cover is decoration. Whatever went wrong, it must never break sync;
+        // this one is retried next time.
+      }
+    }
   }
 
   File get _libraryFile => File('${dir.path}/library.json');
@@ -101,9 +221,9 @@ class LibraryStore extends ChangeNotifier {
 
   /// Validates the credentials and, if they work, stores them.
   Future<void> connect(String token, String chat) async {
-    final candidate = TelegramApi(token.trim(), chat.trim());
+    final candidate = _newApi(token.trim(), chat.trim());
     await candidate.verifyAdmin();
-    await prefs.setString('token', candidate.token);
+    await vault.write(candidate.token);
     await prefs.setString('chat', candidate.chatId);
     api = candidate;
     notifyListeners();
@@ -118,7 +238,14 @@ class LibraryStore extends ChangeNotifier {
     _tracksCache = null;
     _updateOffset = null;
     _indexMessageId = null;
-    await prefs.remove('token');
+    _remoteData = null;
+    _remoteCanonical = null;
+    _remoteVersion = null;
+    _remoteCanonicalNoOwn = null;
+    _coverIds.clear();
+    if (coversDir.existsSync()) coversDir.deleteSync(recursive: true);
+    await coversDir.create(recursive: true);
+    await vault.delete();
     await prefs.remove('chat');
     await prefs.remove('offset');
     await prefs.remove('index_msg');
@@ -126,7 +253,11 @@ class LibraryStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  TelegramApi _newApi(String token, String chat) =>
+      apiHost == null ? TelegramApi(token, chat) : TelegramApi(token, chat, host: apiHost!);
+
   void _startPolling() {
+    if (!autoSync) return;
     _pollTimer?.cancel();
     refresh();
     _pollTimer = Timer.periodic(_pollInterval, (_) => refresh());
@@ -147,18 +278,21 @@ class LibraryStore extends ChangeNotifier {
   /// Several devices may share one bot. getUpdates is called with timeout=0,
   /// so they never hold competing long polls; whichever device sees a post
   /// first publishes it through the index and the others pick it up there.
-  Future<void> refresh() async {
+  Future<void> refresh({bool forceHistory = false}) async {
     final api = this.api;
     if (api == null) return;
     if (_syncing) {
       // An edit arrived mid-sync; run again once this pass finishes.
+      _forceHistoryPush |= forceHistory;
       _pushTimer?.cancel();
       _pushTimer = Timer(const Duration(seconds: 1), refresh);
       return;
     }
     _syncing = true;
+    final force = forceHistory || _forceHistoryPush;
+    _forceHistoryPush = false;
     try {
-      final remote = await api.fetchIndex();
+      final remote = await api.fetchIndex(knownVersion: _remoteVersion);
       final polled = await api.pollTracks(_updateOffset);
 
       if (polled.nextOffset != null && polled.nextOffset != _updateOffset) {
@@ -166,82 +300,150 @@ class LibraryStore extends ChangeNotifier {
         await prefs.setInt('offset', _updateOffset!);
       }
 
-      var merged = data;
-      if (remote != null) {
+      final me = deviceId;
+      final s = stats;
+      // Our own log lives in the stats store, not in [data]; bring it along for the merge.
+      var merged = s == null ? data : data.withHistory(me, s.ownHistory);
+
+      if (remote == null) {
+        _remoteData = null;
+        _remoteCanonical = null;
+        _remoteCanonicalNoOwn = null;
+        _remoteVersion = null;
+      } else {
         _indexMessageId = remote.messageId;
-        merged = SyncData.merge(merged, remote.data);
+        _remoteVersion = remote.version;
+        // A null `data` means the file is unchanged since we last downloaded it.
+        if (remote.data != null) {
+          _remoteData = remote.data;
+          _remoteCanonical = remote.data!.canonical();
+          _remoteCanonicalNoOwn = remote.data!.withoutHistory(me).canonical();
+        }
+        if (_remoteData != null) merged = SyncData.merge(merged, _remoteData!);
       }
       if (polled.tracks.isNotEmpty) {
         merged = SyncData.merge(merged, SyncData(tracks: polled.tracks));
       }
 
+      if (s != null) {
+        // Another device may have reset stats; take that, and the others' logs.
+        await s.applyRemote(merged.history);
+        merged = merged.withHistory(me, s.ownHistory);
+      }
+
       final before = data.canonical();
-      data = merged;
-      final after = merged.canonical();
-      if (after != before) {
+      data = s == null ? merged : merged.withoutHistory(me);
+      if (data.canonical() != before) {
         _tracksCache = null;
         await _saveLocal();
       }
 
-      final remoteCanonical = remote?.data.canonical();
-      final channelEmpty = remote == null && data.tracks.isEmpty && data.playlists.isEmpty;
-      if (!channelEmpty && after != remoteCanonical) {
-        await _pushIndex();
+      final nothingToShare = data.tracks.isEmpty &&
+          data.playlists.isEmpty &&
+          merged.history.values.every((h) => h.events.isEmpty && h.epoch == 0);
+      final channelEmpty = remote == null && nothingToShare;
+      if (!channelEmpty && merged.canonical() != _remoteCanonical) {
+        // If only our own listening log grew, it can wait for the next real
+        // change, a long enough interval, or the app going to the background.
+        final onlyOwnHistory = _remoteCanonicalNoOwn != null &&
+            data.canonical() == _remoteCanonicalNoOwn;
+        final due = DateTime.now().difference(_lastPush) >= historyPushInterval;
+        if (!onlyOwnHistory || force || due) {
+          await _pushIndex(merged);
+        }
       }
 
-        status = null;
+      status = null;
       notifyListeners();
+      unawaited(syncCovers());
     } on TelegramException catch (e) {
-      status = e.message;
+      status = LibraryStatus.error(e);
       notifyListeners();
     } on SocketException {
-      status = 'Нет соединения';
+      status = const LibraryStatus.noConnection();
       notifyListeners();
     } finally {
       _syncing = false;
     }
   }
 
-  Future<void> _pushIndex() async {
-    final id = await api!.publishIndex(data, previousMessageId: _indexMessageId);
+  Future<void> _pushIndex(SyncData snapshot) async {
+    final id = await api!.publishIndex(snapshot, previousMessageId: _indexMessageId);
     _indexMessageId = id;
+    _lastPush = DateTime.now();
+    // The pinned file just changed; fetch it afresh next time.
+    _remoteData = null;
+    _remoteCanonical = null;
+    _remoteCanonicalNoOwn = null;
+    _remoteVersion = null;
     await prefs.setInt('index_msg', id);
+  }
+
+  /// Wipes listening history on every device. Pushed at once, so another
+  /// device cannot bring the old history back.
+  Future<void> resetHistory() async {
+    final s = stats;
+    if (s == null) return;
+    final epoch = s.nextEpoch(data.history.values);
+    await s.reset(epoch);
+    for (final id in data.history.keys.toList()) {
+      data.history[id] = DeviceHistory(epoch, const []);
+    }
+    _forceHistoryPush = true;
+    _changed();
   }
 
   // ---- tracks ----
 
   /// Lets the user pick audio files and uploads them to the channel.
   Future<void> pickAndUpload() async {
-    final api = this.api;
     if (api == null) return;
     final picked = await FilePicker.pickFiles(type: FileType.audio);
-    if (picked.isEmpty) return;
+    await uploadFiles([
+      for (final f in picked)
+        if (f.path != null) File(f.path!),
+    ]);
+  }
+
+  /// Uploads local audio files. Title, artist and cover art come from the
+  /// file's own tags; the file name is only a fallback.
+  Future<void> uploadFiles(List<File> files) async {
+    final api = this.api;
+    if (api == null || files.isEmpty) return;
 
     busy = true;
     notifyListeners();
     try {
-      var n = 0;
-      for (final f in picked) {
-        final path = f.path;
-        if (path == null) continue;
-        n++;
-        status = 'Загрузка $n/${picked.length}: ${f.name}';
+      for (var i = 0; i < files.length; i++) {
+        final file = files[i];
+        final name = file.uri.pathSegments.last;
+        status = LibraryStatus.uploading(i + 1, files.length, name);
         notifyListeners();
 
-        final parts = _guessTags(f.name);
+        final tags = await readAudioTags(file);
+        final guessed = _guessTags(name);
         final track = await api.sendAudio(
-          File(path),
-          title: parts.title,
-          performer: parts.artist,
+          file,
+          title: tags.title ?? guessed.title,
+          performer: tags.artist ?? guessed.artist,
+          duration: tags.durationSeconds,
+          thumbnail: tags.coverJpeg,
         );
-        // We already hold the bytes; seed the cache so first play is instant.
-        await File(path).copy('${cacheDir.path}/${track.uniqueId}');
+
+        // We already hold the bytes; seed the caches so first play and the
+        // cover are instant, with no download.
+        await file.copy('${cacheDir.path}/${track.uniqueId}');
+        final cover = tags.coverJpeg;
+        if (cover != null) {
+          await _coverFile(track.uniqueId).writeAsBytes(cover);
+          _coverIds.add(track.uniqueId);
+        }
         data = SyncData.merge(data, SyncData(tracks: [track]));
         _changed();
       }
       status = null;
     } on TelegramException catch (e) {
-      status = e.message;
+      status = LibraryStatus.error(e);
     } finally {
       busy = false;
       notifyListeners();
@@ -262,6 +464,7 @@ class LibraryStore extends ChangeNotifier {
     data.removed[t.uniqueId] = DateTime.now().millisecondsSinceEpoch;
     final f = cachedFile(t);
     if (f.existsSync()) f.deleteSync();
+    if (_coverIds.remove(t.uniqueId)) _coverFile(t.uniqueId).deleteSync();
     _changed();
     final id = t.messageId;
     if (id != null) await api?.deleteMessage(id);
@@ -283,7 +486,7 @@ class LibraryStore extends ChangeNotifier {
     final now = DateTime.now();
     final p = Playlist(
       id: now.microsecondsSinceEpoch.toRadixString(36),
-      name: name.trim().isEmpty ? 'Плейлист' : name.trim(),
+      name: name.trim().isEmpty ? 'Playlist' : name.trim(),
       trackIds: [...trackIds],
       updatedAt: now.millisecondsSinceEpoch,
     );
